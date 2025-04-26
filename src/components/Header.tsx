@@ -14,7 +14,6 @@ type HeaderProps = {
 export function Header({ user, onLogout }: HeaderProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(!!user);
 
-  // This function would handle actual logout and state change
   const handleLogout = () => {
     onLogout();
     setIsLoggedIn(false);
@@ -37,8 +36,11 @@ export function Header({ user, onLogout }: HeaderProps) {
                 <Link to="/dashboard" className="text-gray-600 hover:text-primary transition-colors">
                   Dashboard
                 </Link>
-                <Link to="/sources" className="text-gray-600 hover:text-primary transition-colors">
-                  Data Sources
+                <Link to="/projects" className="text-gray-600 hover:text-primary transition-colors">
+                  Projects
+                </Link>
+                <Link to="/analysis" className="text-gray-600 hover:text-primary transition-colors">
+                  Analysis
                 </Link>
               </nav>
               
@@ -72,7 +74,7 @@ export function Header({ user, onLogout }: HeaderProps) {
                 <Link to="/login">Log in</Link>
               </Button>
               <Button asChild>
-                <Link to="/register">Sign up</Link>
+                <Link to="/signup">Sign up</Link>
               </Button>
             </div>
           )}
