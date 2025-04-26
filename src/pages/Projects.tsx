@@ -3,21 +3,19 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import ProjectCard from "@/components/ProjectCard";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { mockUser, mockProject } from "@/lib/mockData";
 import { Project } from "@/lib/types";
 import { FolderPlus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Projects = () => {
   const [projects, setProjects] = useState<Project[]>([mockProject]);
-  const [newProjectUrl, setNewProjectUrl] = useState("");
+  const navigate = useNavigate();
 
-  const handleCreateProject = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Creating project with URL:", newProjectUrl);
-    // TODO: Implement project creation logic
+  const handleCreateProject = () => {
+    // Redirect to onboarding page for new project creation
+    navigate("/onboarding");
   };
 
   return (
@@ -40,20 +38,15 @@ const Projects = () => {
                 <DialogHeader>
                   <DialogTitle>Create New Project</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleCreateProject} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="url">Forum URL</Label>
-                    <Input
-                      id="url"
-                      type="url"
-                      placeholder="Enter forum URL"
-                      value={newProjectUrl}
-                      onChange={(e) => setNewProjectUrl(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full">Create Project</Button>
-                </form>
+                <div className="py-4">
+                  <p className="text-muted-foreground mb-4">
+                    Creating a new project will guide you through our onboarding process to set up
+                    data sources and analysis preferences.
+                  </p>
+                  <Button onClick={handleCreateProject} className="w-full">
+                    Continue to Project Setup
+                  </Button>
+                </div>
               </DialogContent>
             </Dialog>
           </div>
@@ -63,7 +56,7 @@ const Projects = () => {
               <ProjectCard
                 key={project.id}
                 project={project}
-                onClick={() => {}}
+                onClick={() => navigate("/dashboard")}
               />
             ))}
           </div>
