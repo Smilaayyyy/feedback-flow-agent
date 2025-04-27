@@ -50,6 +50,13 @@ export function DataSourceForm({ onSubmit }: { onSubmit: (values: DataSourceForm
     toast.success("Data collection started");
   };
 
+  const handleFileBrowse = () => {
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput instanceof HTMLInputElement) {
+      fileInput.click();
+    }
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -126,7 +133,7 @@ export function DataSourceForm({ onSubmit }: { onSubmit: (values: DataSourceForm
                       onChange={(e) => onChange(e.target.files?.[0])}
                       {...field}
                     />
-                    <Button type="button" variant="outline" onClick={() => document.querySelector('input[type="file"]')?.click()}>
+                    <Button type="button" variant="outline" onClick={handleFileBrowse}>
                       <Upload className="mr-2 h-4 w-4" />
                       Browse
                     </Button>
