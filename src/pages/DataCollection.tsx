@@ -1,19 +1,19 @@
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Header from "@/components/Header";
 import UrlForm from "@/components/UrlForm";
 import { mockUser } from "@/lib/mockData";
 import { toast } from "sonner";
+import { DataSource } from "@/lib/types";
 
 const DataCollection = () => {
   const [activeTab, setActiveTab] = useState("forums");
 
   const handleSubmit = (values: any) => {
-    console.log(values);
-    toast.success("Data source added successfully");
+    console.log("Collection initiated with values:", values);
+    // In a real app, this would send the data to your collection agent
   };
 
   return (
@@ -24,12 +24,15 @@ const DataCollection = () => {
         <div className="container max-w-4xl mx-auto">
           <div className="mb-6">
             <h1 className="text-2xl font-bold">Data Collection</h1>
-            <p className="text-muted-foreground">Configure your data sources</p>
+            <p className="text-muted-foreground">Configure and monitor your data sources</p>
           </div>
 
           <Card>
             <CardHeader>
               <CardTitle>Add Data Source</CardTitle>
+              <CardDescription>
+                Set up a new data source for collecting feedback and insights
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="forums" className="w-full" onValueChange={setActiveTab}>
