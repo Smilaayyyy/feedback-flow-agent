@@ -1,16 +1,13 @@
 
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Header from "@/components/Header";
-import UrlForm from "@/components/UrlForm";
 import { mockUser } from "@/lib/mockData";
-import { toast } from "sonner";
-import { DataSource } from "@/lib/types";
+import { ForumSourceForm } from "@/components/forms/ForumSourceForm";
+import { SocialSourceForm } from "@/components/forms/SocialSourceForm";
+import { ReviewSourceForm } from "@/components/forms/ReviewSourceForm";
 
 const DataCollection = () => {
-  const [activeTab, setActiveTab] = useState("forums");
-
   const handleSubmit = (values: any) => {
     console.log("Collection initiated with values:", values);
     // In a real app, this would send the data to your collection agent
@@ -35,28 +32,23 @@ const DataCollection = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="forums" className="w-full" onValueChange={setActiveTab}>
-                <TabsList className="grid grid-cols-4 gap-4 mb-6">
+              <Tabs defaultValue="forums" className="w-full">
+                <TabsList className="grid grid-cols-3 gap-4 mb-6">
                   <TabsTrigger value="forums">Forums</TabsTrigger>
                   <TabsTrigger value="social">Social Media</TabsTrigger>
                   <TabsTrigger value="reviews">Review Sites</TabsTrigger>
-                  <TabsTrigger value="surveys">Surveys</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="forums" className="mt-0">
-                  <UrlForm onSubmit={handleSubmit} />
+                  <ForumSourceForm onSubmit={handleSubmit} />
                 </TabsContent>
                 
                 <TabsContent value="social" className="mt-0">
-                  <UrlForm onSubmit={handleSubmit} />
+                  <SocialSourceForm onSubmit={handleSubmit} />
                 </TabsContent>
                 
                 <TabsContent value="reviews" className="mt-0">
-                  <UrlForm onSubmit={handleSubmit} />
-                </TabsContent>
-                
-                <TabsContent value="surveys" className="mt-0">
-                  <UrlForm onSubmit={handleSubmit} />
+                  <ReviewSourceForm onSubmit={handleSubmit} />
                 </TabsContent>
               </Tabs>
             </CardContent>
