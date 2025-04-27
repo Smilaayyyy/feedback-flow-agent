@@ -13,7 +13,7 @@ import { useState } from "react";
 
 const socialFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  platform: z.enum(["twitter", "facebook", "instagram", "linkedin"]),
+  platform: z.enum(["twitter", "facebook", "linkedin"]), // Only platforms that allow scraping
   keywords: z.string().min(1, { message: "Keywords are required" }),
   timeframe: z.enum(["7days", "30days", "custom"]),
 });
@@ -83,11 +83,13 @@ export function SocialSourceForm({ onSubmit }: { onSubmit: (values: SocialFormVa
                 </FormControl>
                 <SelectContent>
                   <SelectItem value="twitter">Twitter/X</SelectItem>
-                  <SelectItem value="facebook">Facebook</SelectItem>
-                  <SelectItem value="instagram">Instagram</SelectItem>
-                  <SelectItem value="linkedin">LinkedIn</SelectItem>
+                  <SelectItem value="facebook">Facebook (Public Pages)</SelectItem>
+                  <SelectItem value="linkedin">LinkedIn (Public Posts)</SelectItem>
                 </SelectContent>
               </Select>
+              <FormDescription>
+                Select the social media platform to collect data from. Only platforms that allow public data collection are available.
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}

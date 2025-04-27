@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Header from "@/components/Header";
 import { mockUser } from "@/lib/mockData";
-import { ForumSourceForm } from "@/components/forms/ForumSourceForm";
+import { DataSourceForm } from "@/components/forms/DataSourceForm";
 import { SocialSourceForm } from "@/components/forms/SocialSourceForm";
 import { ReviewSourceForm } from "@/components/forms/ReviewSourceForm";
 
@@ -32,15 +32,15 @@ const DataCollection = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="forums" className="w-full">
+              <Tabs defaultValue="data" className="w-full">
                 <TabsList className="grid grid-cols-3 gap-4 mb-6">
-                  <TabsTrigger value="forums">Forums</TabsTrigger>
+                  <TabsTrigger value="data">Forms & Surveys</TabsTrigger>
                   <TabsTrigger value="social">Social Media</TabsTrigger>
                   <TabsTrigger value="reviews">Review Sites</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="forums" className="mt-0">
-                  <ForumSourceForm onSubmit={handleSubmit} />
+                <TabsContent value="data" className="mt-0">
+                  <DataSourceForm onSubmit={handleSubmit} />
                 </TabsContent>
                 
                 <TabsContent value="social" className="mt-0">
