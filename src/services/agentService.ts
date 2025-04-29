@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export type AgentType = "form" | "social" | "review";
-export type DataSourceType = "forum" | "website" | "social" | "survey" | "reviews";
+export type DataSourceType = "forum" | "social" | "survey" | "reviews";
 
 export type CollectionStatus = "pending" | "collecting" | "processing" | "analyzing" | "completed" | "error";
 
@@ -15,6 +15,14 @@ export const createDataSource = async (
   metadata: Record<string, any> = {}
 ) => {
   try {
+    // Validate URL format
+    if (!isValidUrl(url, type)) {
+      return { 
+        data: null, 
+        error: new Error(`Invalid URL for ${type} data source. Please check the URL format.`) 
+      };
+    }
+    
     // Insert data source into Supabase
     const { data, error } = await supabase
       .from("data_sources")
@@ -37,6 +45,44 @@ export const createDataSource = async (
     console.error("Error creating data source:", error);
     toast.error("Failed to create data source");
     return { data: null, error };
+  }
+};
+
+// Validate URLs based on data source type
+const isValidUrl = (url: string, type: DataSourceType): boolean => {
+  try {
+    const urlObj = new URL(url);
+    
+    // Check for specific platforms based on type
+    switch (type) {
+      case "social":
+        const allowedSocialDomains = [
+          "facebook.com", "instagram.com", "reddit.com", "youtube.com", "twitter.com", "x.com", "linkedin.com"
+        ];
+        return allowedSocialDomains.some(domain => urlObj.hostname.includes(domain));
+      
+      case "forum":
+        // Forums can be on various domains, just ensure it has a valid protocol
+        return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+      
+      case "reviews":
+        const allowedReviewDomains = [
+          "trustpilot.com", "yelp.com", "google.com", "tripadvisor.com", "amazon.com"
+        ];
+        return allowedReviewDomains.some(domain => urlObj.hostname.includes(domain));
+      
+      case "survey":
+        const allowedSurveyDomains = [
+          "surveymonkey.com", "typeform.com", "google.com", "forms.office.com", "qualtrics.com"
+        ];
+        return allowedSurveyDomains.some(domain => urlObj.hostname.includes(domain));
+      
+      default:
+        return true;
+    }
+  } catch (e) {
+    // If URL parsing fails, it's not a valid URL
+    return false;
   }
 };
 
