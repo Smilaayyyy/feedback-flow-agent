@@ -10,15 +10,15 @@ import UrlForm from "@/components/UrlForm";
 import DataSourceList from "@/components/DataSourceList";
 import AnalysisSummary from "@/components/AnalysisSummary";
 import StatusCard from "@/components/StatusCard";
-import { mockUser, mockProject, mockDataSources, mockAnalysisResults } from "@/lib/mockData";
-import { DataSource } from "@/lib/types";
+import { mockUser, mockProject, mockAnalysisResults } from "@/lib/mockData";
 import { toast } from "sonner";
+import { getDataSources } from "@/services/agentService";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [dataSources, setDataSources] = useState<DataSource[]>(mockDataSources);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     // Check if user is logged in
@@ -29,22 +29,13 @@ const Dashboard = () => {
   }, [navigate]);
 
   const handleAddDataSource = (values: any) => {
-    const newSource = {
-      id: `ds-${dataSources.length + 1}`,
-      name: values.name,
-      url: values.url,
-      type: values.type as DataSource["type"],
-      status: "pending" as const,
-      lastUpdated: new Date(),
-    };
-
-    setDataSources([...dataSources, newSource]);
+    setRefreshTrigger(prev => prev + 1);
     setDialogOpen(false);
   };
 
   const handleDeleteSource = (sourceId: string) => {
-    setDataSources(dataSources.filter(source => source.id !== sourceId));
     toast.success("Data source removed successfully");
+    setRefreshTrigger(prev => prev + 1);
   };
 
   const handleRunAnalysis = (sourceId: string) => {
@@ -86,7 +77,7 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <StatusCard 
               title="Total Data Sources" 
-              value={dataSources.length} 
+              value="..." 
               description="Sources being monitored"
             />
             <StatusCard 
@@ -123,7 +114,7 @@ const Dashboard = () => {
                   </CardHeader>
                   <CardContent>
                     <DataSourceList 
-                      sources={dataSources.slice(0, 2)} 
+                      refreshTrigger={refreshTrigger}
                       onRunAnalysis={handleRunAnalysis}
                     />
                   </CardContent>
@@ -182,7 +173,7 @@ const Dashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <DataSourceList 
-                    sources={dataSources} 
+                    refreshTrigger={refreshTrigger}
                     onRunAnalysis={handleRunAnalysis}
                     onDelete={handleDeleteSource}
                   />

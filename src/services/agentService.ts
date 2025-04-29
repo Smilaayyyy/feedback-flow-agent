@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export type AgentType = "form" | "social" | "review";
-export type DataSourceType = "forum" | "social" | "reviews" | "survey";
+export type DataSourceType = "forum" | "website" | "social" | "survey" | "reviews";
 
 export type CollectionStatus = "pending" | "collecting" | "processing" | "analyzing" | "completed" | "error";
 

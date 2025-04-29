@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
-import { createDataSource } from "@/services/agentService";
+import { createDataSource, DataSourceType } from "@/services/agentService";
 import { toast } from "sonner";
 
 const urlFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   url: z.string().url({ message: "Please enter a valid URL." }),
-  type: z.enum(["forum", "social", "review", "survey"]),
+  type: z.enum(["forum", "social", "reviews", "survey"]),
 });
 
 type UrlFormValues = z.infer<typeof urlFormSchema>;
@@ -37,7 +37,7 @@ const UrlForm = ({ onSubmit }: { onSubmit: (values: UrlFormValues) => void }) =>
       const { data, error } = await createDataSource(
         values.name,
         values.url,
-        values.type,
+        values.type as DataSourceType,
         { submittedAt: new Date().toISOString() }
       );
       
@@ -104,7 +104,7 @@ const UrlForm = ({ onSubmit }: { onSubmit: (values: UrlFormValues) => void }) =>
                 <SelectContent>
                   <SelectItem value="forum">Forum / Discussion</SelectItem>
                   <SelectItem value="social">Social Media</SelectItem>
-                  <SelectItem value="review">Review Site</SelectItem>
+                  <SelectItem value="reviews">Review Site</SelectItem>
                   <SelectItem value="survey">Survey / Form</SelectItem>
                 </SelectContent>
               </Select>

@@ -11,7 +11,7 @@ type DataSource = {
   id: string;
   name: string;
   url: string;
-  type: 'forum' | 'social' | 'review' | 'survey';
+  type: 'forum' | 'social' | 'reviews' | 'survey';
   status: CollectionStatus;
   last_updated: string;
   collector_agents: {
