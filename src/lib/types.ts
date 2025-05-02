@@ -1,3 +1,4 @@
+
 export type User = {
   id: string;
   name: string;
@@ -40,6 +41,7 @@ export type Project = {
   createdAt: Date;
   alertSettings?: AlertSettings;
   analysisPreferences?: AnalysisPreferences;
+  userId?: string; // Add userId as an optional property
 };
 
 export type OnboardingStep = 
