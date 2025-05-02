@@ -27,7 +27,7 @@ export const createDataSource = async (
     const { data, error } = await supabase
       .from("data_sources")
       .insert([
-        { name, url, type, metadata }
+        { name, url, type, metadata, project_id: metadata.project_id || null }
       ])
       .select("*, collector_agents(*)");
     
@@ -36,9 +36,8 @@ export const createDataSource = async (
     // Successfully created data source
     const dataSource = data[0];
     
-    // Simulate starting the collector agent
-    // In a production app, this might trigger a serverless function or webhook
-    await simulateAgentProcess(dataSource);
+    // Trigger the API endpoint for data collection
+    await triggerCollectionApi(dataSource);
     
     return { data: dataSource, error: null };
   } catch (error: any) {
@@ -87,12 +86,18 @@ const isValidUrl = (url: string, type: DataSourceType): boolean => {
 };
 
 // Function to get all data sources
-export const getDataSources = async () => {
+export const getDataSources = async (projectId?: string) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("data_sources")
-      .select("*, collector_agents(name, type)")
-      .order("created_at", { ascending: false });
+      .select("*, collector_agents(name, type)");
+    
+    // If project ID is provided, filter by project ID
+    if (projectId) {
+      query = query.eq('project_id', projectId);
+    }
+    
+    const { data, error } = await query.order("created_at", { ascending: false });
     
     if (error) throw error;
     
@@ -121,7 +126,99 @@ export const updateDataSourceStatus = async (id: string, status: CollectionStatu
   }
 };
 
-// This simulates the collection process - in a real app this would be done by a backend service
+// Function to create a new project
+export const createProject = async (name: string, description?: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("projects")
+      .insert([
+        { name, description }
+      ])
+      .select();
+    
+    if (error) throw error;
+    
+    return { data: data[0], error: null };
+  } catch (error: any) {
+    console.error("Error creating project:", error);
+    toast.error("Failed to create project");
+    return { data: null, error };
+  }
+};
+
+// Function to get all projects
+export const getProjects = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("projects")
+      .select(`
+        *,
+        data_sources (
+          id,
+          name,
+          type,
+          status
+        )
+      `)
+      .order("created_at", { ascending: false });
+    
+    if (error) throw error;
+    
+    return { data, error: null };
+  } catch (error: any) {
+    console.error("Error fetching projects:", error);
+    return { data: null, error };
+  }
+};
+
+// This calls your FastAPI backend for data collection
+const triggerCollectionApi = async (dataSource: any) => {
+  try {
+    // First, update the status to collecting
+    await updateDataSourceStatus(dataSource.id, "collecting");
+    
+    // In a production environment, this would call your FastAPI endpoint
+    // For demonstration, we'll simulate the API call with a timeout
+    
+    // Example API call structure:
+    /*
+    const response = await fetch('http://your-api-url/api/v1/collect', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        config: {
+          social: {
+            platform: dataSource.metadata?.platform || 'Twitter',
+            hashtags: dataSource.metadata?.hashtags || [],
+          },
+          review: {
+            websites: [dataSource.metadata?.platform || 'Google'],
+          },
+          survey: {
+            form_id: dataSource.id,
+            api_endpoints: [dataSource.url],
+          }
+        }
+      }),
+    });
+    
+    const responseData = await response.json();
+    */
+    
+    // For now, just simulate the collection process
+    await simulateAgentProcess(dataSource);
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Error triggering API collection:", error);
+    await updateDataSourceStatus(dataSource.id, "error");
+    return { success: false };
+  }
+};
+
+// This simulates the collection process - in a real app this would be done by your FastAPI backend
 const simulateAgentProcess = async (dataSource: any) => {
   // Update status to collecting
   await updateDataSourceStatus(dataSource.id, "collecting");

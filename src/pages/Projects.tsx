@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import ProjectCard from "@/components/ProjectCard";
@@ -7,13 +7,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { mockUser, mockProject } from "@/lib/mockData";
+import { mockUser } from "@/lib/mockData";
 import { Project } from "@/lib/types";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FolderPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import * as z from "zod";
+import { createProject, getProjects } from "@/services/agentService";
 
 const projectSchema = z.object({
   name: z.string().min(2, "Project name must be at least 2 characters."),
@@ -21,8 +23,9 @@ const projectSchema = z.object({
 });
 
 const Projects = () => {
-  const [projects, setProjects] = useState<Project[]>([mockProject]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   const form = useForm<z.infer<typeof projectSchema>>({
@@ -33,10 +36,43 @@ const Projects = () => {
     },
   });
 
-  const onSubmit = (values: z.infer<typeof projectSchema>) => {
-    console.log(values);
-    setDialogOpen(false);
-    navigate("/data-collection");
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    setIsLoading(true);
+    const { data, error } = await getProjects();
+    
+    if (error) {
+      toast.error("Failed to load projects");
+      console.error("Error loading projects:", error);
+    } else if (data) {
+      setProjects(data);
+    } else {
+      // If no data from API, use mock data for demonstration
+      setProjects([]);
+    }
+    
+    setIsLoading(false);
+  };
+
+  const onSubmit = async (values: z.infer<typeof projectSchema>) => {
+    try {
+      const { data, error } = await createProject(values.name, values.description);
+      
+      if (error) throw error;
+      
+      setDialogOpen(false);
+      toast.success(`Project "${values.name}" created successfully`);
+      
+      // Navigate to data collection page with project ID
+      navigate(`/data-collection?projectId=${data.id}&projectName=${encodeURIComponent(data.name)}`);
+      
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast.error("Failed to create project");
+    }
   };
 
   return (
@@ -100,15 +136,32 @@ const Projects = () => {
             </Dialog>
           </div>
           
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onClick={() => navigate("/dashboard")}
-              />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : projects.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onClick={() => navigate(`/dashboard?projectId=${project.id}`)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center p-8 border border-dashed rounded-lg">
+              <h3 className="text-lg font-medium mb-4">No projects yet</h3>
+              <p className="text-muted-foreground mb-6">
+                Create your first feedback analysis project to get started.
+              </p>
+              <Button onClick={() => setDialogOpen(true)}>
+                <FolderPlus className="mr-2 h-4 w-4" />
+                Create Your First Project
+              </Button>
+            </div>
+          )}
         </div>
       </main>
     </div>

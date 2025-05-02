@@ -24,20 +24,26 @@ type DataSourceListProps = {
   onRunAnalysis?: (sourceId: string) => void;
   onDelete?: (sourceId: string) => void;
   refreshTrigger?: number;
+  projectId?: string | null;
 };
 
-export function DataSourceList({ onRunAnalysis, onDelete, refreshTrigger = 0 }: DataSourceListProps) {
+export function DataSourceList({ 
+  onRunAnalysis, 
+  onDelete, 
+  refreshTrigger = 0, 
+  projectId = null 
+}: DataSourceListProps) {
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [runningAnalysis, setRunningAnalysis] = useState<string | null>(null);
 
   useEffect(() => {
     loadDataSources();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, projectId]);
 
   const loadDataSources = async () => {
     setIsLoading(true);
-    const { data, error } = await getDataSources();
+    const { data, error } = await getDataSources(projectId || undefined);
     
     if (error) {
       toast.error("Failed to load data sources");
@@ -55,6 +61,17 @@ export function DataSourceList({ onRunAnalysis, onDelete, refreshTrigger = 0 }: 
     try {
       // Update status to processing
       await updateDataSourceStatus(sourceId, "processing");
+      
+      // In a production environment, this would call your FastAPI endpoint
+      // Example API call:
+      /*
+      const response = await fetch('http://your-api-url/api/v1/analyze/sourceId', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      */
       
       // Simulate analysis process
       setTimeout(async () => {
@@ -75,6 +92,7 @@ export function DataSourceList({ onRunAnalysis, onDelete, refreshTrigger = 0 }: 
     if (onDelete) onDelete(sourceId);
   };
 
+  // Get status color and label
   const getStatusColor = (status: CollectionStatus) => {
     switch (status) {
       case 'completed':

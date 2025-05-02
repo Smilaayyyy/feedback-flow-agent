@@ -1,46 +1,125 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Header from "@/components/Header";
-import UrlForm from "@/components/UrlForm";
 import DataSourceList from "@/components/DataSourceList";
 import AnalysisSummary from "@/components/AnalysisSummary";
 import StatusCard from "@/components/StatusCard";
-import { mockUser, mockProject, mockAnalysisResults } from "@/lib/mockData";
+import { mockUser, mockAnalysisResults } from "@/lib/mockData";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { getDataSources } from "@/services/agentService";
+import { ArrowLeft } from "lucide-react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState("Your Project");
+  const [dataSourceCount, setDataSourceCount] = useState(0);
 
   useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem("user");
-    if (!storedUser) {
-      navigate("/");
+    // Check for project ID in query parameters
+    const params = new URLSearchParams(location.search);
+    const id = params.get('projectId');
+    
+    if (id) {
+      setProjectId(id);
+      loadProjectDetails(id);
+    } else {
+      // If no project ID, redirect to projects page
+      toast.error("No project selected");
+      navigate("/projects");
     }
-  }, [navigate]);
+  }, [location.search, navigate]);
 
-  const handleAddDataSource = (values: any) => {
-    setRefreshTrigger(prev => prev + 1);
-    setDialogOpen(false);
+  // Subscribe to real-time updates for data sources
+  useEffect(() => {
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'data_sources'
+        },
+        () => {
+          setRefreshTrigger(prev => prev + 1);
+        }
+      )
+      .subscribe();   
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const loadProjectDetails = async (id: string) => {
+    try {
+      // Get project details
+      const { data: projectData, error: projectError } = await supabase
+        .from("projects")
+        .select("name")
+        .eq("id", id)
+        .single();
+        
+      if (projectError) throw projectError;
+      if (projectData) {
+        setProjectName(projectData.name);
+      }
+      
+      // Get data source count
+      const { data: sourceData, error: sourceError } = await getDataSources(id);
+      
+      if (sourceError) throw sourceError;
+      if (sourceData) {
+        setDataSourceCount(sourceData.length);
+      }
+    } catch (error) {
+      console.error("Error loading project details:", error);
+      toast.error("Failed to load project details");
+    }
   };
 
-  const handleDeleteSource = (sourceId: string) => {
-    toast.success("Data source removed successfully");
-    setRefreshTrigger(prev => prev + 1);
+  const handleDeleteSource = async (sourceId: string) => {
+    try {
+      const { error } = await supabase
+        .from("data_sources")
+        .delete()
+        .eq("id", sourceId);
+      
+      if (error) throw error;
+      
+      toast.success("Data source removed successfully");
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Update data source count
+      const { data } = await getDataSources(projectId || undefined);
+      if (data) {
+        setDataSourceCount(data.length);
+      }
+    } catch (error) {
+      console.error("Error deleting data source:", error);
+      toast.error("Failed to delete data source");
+    }
   };
 
   const handleRunAnalysis = (sourceId: string) => {
-    // This would trigger an analysis in a real app
+    // This would trigger an analysis via your FastAPI
     console.log(`Running analysis for source ${sourceId}`);
+    toast.success("Analysis request submitted");
+  };
+
+  const handleAddDataSource = () => {
+    navigate(`/data-collection?projectId=${projectId}&projectName=${encodeURIComponent(projectName)}`);
   };
 
   return (
@@ -49,35 +128,33 @@ const Dashboard = () => {
       
       <main className="flex-1 p-4 md:p-6 bg-slate-50">
         <div className="container max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold">{mockProject.name}</h1>
-              <p className="text-muted-foreground">
-                Dashboard overview of your feedback analysis
-              </p>
-            </div>
-            <div className="mt-3 md:mt-0">
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>Add Data Source</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Add New Data Source</DialogTitle>
-                    <DialogDescription>
-                      Enter the URL of the forum, website, or survey you want to analyze.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <UrlForm onSubmit={handleAddDataSource} />
-                </DialogContent>
-              </Dialog>
+          <div className="mb-6">
+            <Button 
+              variant="ghost" 
+              className="mb-4 pl-0 hover:bg-transparent hover:text-primary"
+              onClick={() => navigate("/projects")}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
+            </Button>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">{projectName}</h1>
+                <p className="text-muted-foreground">
+                  Dashboard overview of your feedback analysis
+                </p>
+              </div>
+              <div className="mt-3 md:mt-0">
+                <Button onClick={handleAddDataSource}>
+                  Add Data Source
+                </Button>
+              </div>
             </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <StatusCard 
               title="Total Data Sources" 
-              value="..." 
+              value={dataSourceCount.toString()} 
               description="Sources being monitored"
             />
             <StatusCard 
@@ -116,6 +193,7 @@ const Dashboard = () => {
                     <DataSourceList 
                       refreshTrigger={refreshTrigger}
                       onRunAnalysis={handleRunAnalysis}
+                      projectId={projectId}
                     />
                   </CardContent>
                   <CardFooter>
@@ -152,23 +230,7 @@ const Dashboard = () => {
                       <CardTitle>Data Sources</CardTitle>
                       <CardDescription>Manage your feedback collection sources</CardDescription>
                     </div>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button size="sm">Add Source</Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>Add New Data Source</DialogTitle>
-                          <DialogDescription>
-                            Enter the URL of the forum, website, or survey you want to analyze.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <UrlForm onSubmit={(values) => {
-                          handleAddDataSource(values);
-                          toast.success("Data source added successfully");
-                        }} />
-                      </DialogContent>
-                    </Dialog>
+                    <Button size="sm" onClick={handleAddDataSource}>Add Source</Button>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -176,6 +238,7 @@ const Dashboard = () => {
                     refreshTrigger={refreshTrigger}
                     onRunAnalysis={handleRunAnalysis}
                     onDelete={handleDeleteSource}
+                    projectId={projectId}
                   />
                 </CardContent>
               </Card>
