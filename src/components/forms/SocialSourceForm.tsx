@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import CollectionProgress from "../CollectionProgress";
 import { useState } from "react";
+import { createDataSource } from "@/services/agentService";
 
 const socialFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -20,7 +21,13 @@ const socialFormSchema = z.object({
 
 type SocialFormValues = z.infer<typeof socialFormSchema>;
 
-export function SocialSourceForm({ onSubmit }: { onSubmit: (values: SocialFormValues) => void }) {
+export function SocialSourceForm({ 
+  onSubmit,
+  projectId
+}: { 
+  onSubmit: (values: SocialFormValues) => void;
+  projectId?: string | null;
+}) {
   const [collectionStatus, setCollectionStatus] = useState<'idle' | 'collecting' | 'processing' | 'analyzing' | 'completed' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
 
@@ -37,6 +44,25 @@ export function SocialSourceForm({ onSubmit }: { onSubmit: (values: SocialFormVa
   const handleSubmit = async (values: SocialFormValues) => {
     setCollectionStatus('collecting');
     setProgress(25);
+    
+    // Add projectId to the source data if available
+    if (projectId) {
+      try {
+        await createDataSource(
+          values.name,
+          `https://api.socialmedia.com/${values.platform}`,
+          "social",
+          { 
+            project_id: projectId,
+            platform: values.platform,
+            keywords: values.keywords,
+            timeframe: values.timeframe
+          }
+        );
+      } catch (error) {
+        console.error("Error creating social data source:", error);
+      }
+    }
     
     setTimeout(() => setProgress(50), 2000);
     setTimeout(() => {

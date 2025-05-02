@@ -5,15 +5,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import CollectionProgress from "../CollectionProgress";
 import { useState } from "react";
+import { createDataSource } from "@/services/agentService";
 
 const reviewFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  platforms: z.array(z.string()).min(1, { message: "Select at least one platform" }),
+  platforms: z.array(z.string()).min(1, { message: "At least one platform is required" }),
   productName: z.string().min(1, { message: "Product name is required" }),
   minRating: z.string(),
   timeframe: z.enum(["7days", "30days", "custom"]),
@@ -21,39 +22,56 @@ const reviewFormSchema = z.object({
 
 type ReviewFormValues = z.infer<typeof reviewFormSchema>;
 
-export function ReviewSourceForm({ onSubmit }: { onSubmit: (values: ReviewFormValues) => void }) {
+export function ReviewSourceForm({ 
+  onSubmit,
+  projectId
+}: { 
+  onSubmit: (values: ReviewFormValues) => void;
+  projectId?: string | null;
+}) {
   const [collectionStatus, setCollectionStatus] = useState<'idle' | 'collecting' | 'processing' | 'analyzing' | 'completed' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
 
   const form = useForm<ReviewFormValues>({
     resolver: zodResolver(reviewFormSchema),
     defaultValues: {
       name: "",
-      platforms: [],
+      platforms: ["Google"],
       productName: "",
-      minRating: "all",
-      timeframe: "7days",
+      minRating: "0",
+      timeframe: "30days",
     },
   });
 
-  const handlePlatformSelect = (platform: string) => {
-    const current = [...selectedPlatforms];
-    const index = current.indexOf(platform);
-    
-    if (index === -1) {
-      current.push(platform);
-    } else {
-      current.splice(index, 1);
-    }
-    
-    setSelectedPlatforms(current);
-    form.setValue("platforms", current);
-  };
+  const platforms = [
+    { id: "Google", label: "Google Reviews" },
+    { id: "Trustpilot", label: "Trustpilot" },
+    { id: "Yelp", label: "Yelp" },
+    { id: "Amazon", label: "Amazon Reviews" },
+  ];
 
   const handleSubmit = async (values: ReviewFormValues) => {
     setCollectionStatus('collecting');
     setProgress(25);
+    
+    if (projectId) {
+      try {
+        await createDataSource(
+          values.name,
+          `https://api.reviews.com/${values.platforms[0].toLowerCase()}`,
+          "reviews",
+          { 
+            project_id: projectId,
+            platforms: values.platforms,
+            product_name: values.productName,
+            min_rating: values.minRating,
+            timeframe: values.timeframe
+          }
+        );
+      } catch (error) {
+        console.error("Error creating review data source:", error);
+      }
+    }
     
     setTimeout(() => setProgress(50), 2000);
     setTimeout(() => {
@@ -91,23 +109,45 @@ export function ReviewSourceForm({ onSubmit }: { onSubmit: (values: ReviewFormVa
           name="platforms"
           render={() => (
             <FormItem>
-              <FormLabel>Platforms</FormLabel>
-              <div className="flex flex-wrap gap-2">
-                {["amazon", "trustpilot", "yelp", "google"].map((platform) => (
-                  <Button
-                    key={platform}
-                    type="button"
-                    variant={selectedPlatforms.includes(platform) ? "default" : "outline"}
-                    onClick={() => handlePlatformSelect(platform)}
-                    className="capitalize"
-                  >
-                    {platform}
-                  </Button>
+              <FormLabel>Review Platforms</FormLabel>
+              <FormDescription>
+                Select review sites to scrape for feedback
+              </FormDescription>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {platforms.map((platform) => (
+                  <FormField
+                    key={platform.id}
+                    control={form.control}
+                    name="platforms"
+                    render={({ field }) => {
+                      return (
+                        <FormItem
+                          key={platform.id}
+                          className="flex flex-row items-start space-x-3 space-y-0"
+                        >
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value?.includes(platform.id)}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([...field.value, platform.id])
+                                  : field.onChange(
+                                      field.value?.filter(
+                                        (value) => value !== platform.id
+                                      )
+                                    )
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal">
+                            {platform.label}
+                          </FormLabel>
+                        </FormItem>
+                      )
+                    }}
+                  />
                 ))}
               </div>
-              <FormDescription>
-                Select one or more platforms to collect reviews from
-              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -118,10 +158,13 @@ export function ReviewSourceForm({ onSubmit }: { onSubmit: (values: ReviewFormVa
           name="productName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Product or Business Name</FormLabel>
+              <FormLabel>Product or Company Name</FormLabel>
               <FormControl>
-                <Input placeholder="Enter product or business name" {...field} />
+                <Input placeholder="e.g. 'Acme Inc.'" {...field} />
               </FormControl>
+              <FormDescription>
+                Enter the name of the product or company to search for reviews
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -133,20 +176,38 @@ export function ReviewSourceForm({ onSubmit }: { onSubmit: (values: ReviewFormVa
           render={({ field }) => (
             <FormItem>
               <FormLabel>Minimum Rating</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select minimum rating" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="all">All Ratings</SelectItem>
-                  <SelectItem value="1">1+ Star</SelectItem>
-                  <SelectItem value="2">2+ Stars</SelectItem>
-                  <SelectItem value="3">3+ Stars</SelectItem>
-                  <SelectItem value="4">4+ Stars</SelectItem>
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <RadioGroup
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                  className="flex space-x-4"
+                >
+                  <FormItem className="flex items-center space-x-1 space-y-0">
+                    <FormControl>
+                      <RadioGroupItem value="0" />
+                    </FormControl>
+                    <FormLabel className="font-normal">All</FormLabel>
+                  </FormItem>
+                  <FormItem className="flex items-center space-x-1 space-y-0">
+                    <FormControl>
+                      <RadioGroupItem value="1" />
+                    </FormControl>
+                    <FormLabel className="font-normal">1★+</FormLabel>
+                  </FormItem>
+                  <FormItem className="flex items-center space-x-1 space-y-0">
+                    <FormControl>
+                      <RadioGroupItem value="2" />
+                    </FormControl>
+                    <FormLabel className="font-normal">2★+</FormLabel>
+                  </FormItem>
+                  <FormItem className="flex items-center space-x-1 space-y-0">
+                    <FormControl>
+                      <RadioGroupItem value="3" />
+                    </FormControl>
+                    <FormLabel className="font-normal">3★+</FormLabel>
+                  </FormItem>
+                </RadioGroup>
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

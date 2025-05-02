@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import CollectionProgress from "../CollectionProgress";
 import { useState } from "react";
 import { Upload } from "lucide-react";
+import { createDataSource } from "@/services/agentService";
 
 const dataSourceFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -20,7 +21,13 @@ const dataSourceFormSchema = z.object({
 
 type DataSourceFormValues = z.infer<typeof dataSourceFormSchema>;
 
-export function DataSourceForm({ onSubmit }: { onSubmit: (values: DataSourceFormValues) => void }) {
+export function DataSourceForm({ 
+  onSubmit, 
+  projectId 
+}: { 
+  onSubmit: (values: DataSourceFormValues) => void;
+  projectId?: string | null;
+}) {
   const [collectionStatus, setCollectionStatus] = useState<'idle' | 'collecting' | 'processing' | 'analyzing' | 'completed' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
 
@@ -35,6 +42,25 @@ export function DataSourceForm({ onSubmit }: { onSubmit: (values: DataSourceForm
   const handleSubmit = async (values: DataSourceFormValues) => {
     setCollectionStatus('collecting');
     setProgress(25);
+    
+    // Add projectId to the source data
+    if (projectId) {
+      const sourceData = {
+        ...values,
+        projectId
+      };
+      
+      try {
+        await createDataSource(
+          values.name,
+          values.apiUrl || "https://example.com/api",
+          "forum",
+          { project_id: projectId }
+        );
+      } catch (error) {
+        console.error("Error creating data source:", error);
+      }
+    }
     
     setTimeout(() => setProgress(50), 2000);
     setTimeout(() => {

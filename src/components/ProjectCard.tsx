@@ -15,7 +15,7 @@ type Project = {
   name: string;
   description?: string;
   created_at: string;
-  data_sources: DataSource[];
+  data_sources?: DataSource[];
 };
 
 type ProjectCardProps = {
@@ -24,21 +24,27 @@ type ProjectCardProps = {
 };
 
 export function ProjectCard({ project, onClick }: ProjectCardProps) {
+  // Make sure we have valid data with defaults
+  const name = project.name || "Unnamed Project";
+  const description = project.description || "";
+  const created_at = project.created_at || new Date().toISOString();
+  const data_sources = project.data_sources || [];
+  
   const formattedDate = new Intl.DateTimeFormat('en-US', { 
     year: 'numeric', 
     month: 'short', 
     day: 'numeric' 
-  }).format(new Date(project.created_at));
+  }).format(new Date(created_at));
   
-  const completedSources = project.data_sources?.filter(source => source.status === 'completed').length || 0;
-  const totalSources = project.data_sources?.length || 0;
+  const completedSources = data_sources?.filter(source => source.status === 'completed').length || 0;
+  const totalSources = data_sources?.length || 0;
   
   return (
     <Card className="animate-fade-in">
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle>{project.name}</CardTitle>
+            <CardTitle>{name}</CardTitle>
             <CardDescription>Created on {formattedDate}</CardDescription>
           </div>
           <Badge variant={totalSources > 0 ? "default" : "outline"}>
@@ -51,9 +57,9 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           <div className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">Data Sources:</span> {totalSources}
           </div>
-          {project.description && (
+          {description && (
             <div className="text-sm text-muted-foreground mt-2 line-clamp-2">
-              {project.description}
+              {description}
             </div>
           )}
         </div>

@@ -44,6 +44,7 @@ export type Database = {
           last_updated: string | null
           metadata: Json | null
           name: string
+          project_id: string | null
           status: string
           type: string
           url: string
@@ -56,6 +57,7 @@ export type Database = {
           last_updated?: string | null
           metadata?: Json | null
           name: string
+          project_id?: string | null
           status?: string
           type: string
           url: string
@@ -68,6 +70,7 @@ export type Database = {
           last_updated?: string | null
           metadata?: Json | null
           name?: string
+          project_id?: string | null
           status?: string
           type?: string
           url?: string
@@ -81,7 +84,35 @@ export type Database = {
             referencedRelation: "collector_agents"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "data_sources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
     }
     Views: {

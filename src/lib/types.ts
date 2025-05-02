@@ -1,4 +1,3 @@
-
 export type User = {
   id: string;
   name: string;
@@ -35,8 +34,8 @@ export type Project = {
   id: string;
   name: string;
   description?: string;
-  userId: string;
-  dataSources: DataSource[];
+  created_at: string;
+  data_sources?: DataSource[];
   analysisResults: AnalysisResult[];
   createdAt: Date;
   alertSettings?: AlertSettings;
