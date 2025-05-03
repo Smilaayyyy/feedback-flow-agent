@@ -37,14 +37,16 @@ const UrlForm = ({ onSubmit }: { onSubmit: (values: UrlFormValues) => void }) =>
     setIsSubmitting(true);
     try {
       // Create data source in Supabase and trigger collector agent
+      const metadata = { 
+        submittedAt: new Date().toISOString(),
+        platform: values.platform || null
+      };
+      
       const { data, error } = await createDataSource(
         values.name,
         values.url,
         values.type as DataSourceType,
-        { 
-          submittedAt: new Date().toISOString(),
-          platform: values.platform || null
-        }
+        metadata
       );
       
       if (error) throw error;

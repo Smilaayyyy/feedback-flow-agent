@@ -1,7 +1,7 @@
 
 import { toast } from "sonner";
 import { sendToCollector } from "./collectionService";
-import { checkTaskStatus } from "./taskService";
+import { checkTaskStatus, TaskStatusResponse } from "./taskService";
 import { processCollectedData, analyzeProcessedData } from "./processingService";
 import { generateDashboard } from "./dashboardService";
 
@@ -23,14 +23,15 @@ export const runFullAnalysisPipeline = async (sourceData: {
     while (collectionStatus !== "completed" && collectionStatus !== "failed") {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
       const { data: statusData } = await checkTaskStatus(collectionTaskId);
-      collectionStatus = statusData?.status || "pending";
+      const response = statusData as TaskStatusResponse;
+      collectionStatus = response?.status || "pending";
       
-      if (statusData?.status === "completed") {
+      if (response?.status === "completed") {
         toast.success("Data collection completed");
         break;
       }
       
-      if (statusData?.status === "failed") {
+      if (response?.status === "failed") {
         throw new Error("Data collection failed");
       }
     }
@@ -47,14 +48,15 @@ export const runFullAnalysisPipeline = async (sourceData: {
     while (processStatus !== "completed" && processStatus !== "failed") {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
       const { data: statusData } = await checkTaskStatus(processTaskId);
-      processStatus = statusData?.status || "pending";
+      const response = statusData as TaskStatusResponse;
+      processStatus = response?.status || "pending";
       
-      if (statusData?.status === "completed") {
+      if (response?.status === "completed") {
         toast.success("Data processing completed");
         break;
       }
       
-      if (statusData?.status === "failed") {
+      if (response?.status === "failed") {
         throw new Error("Data processing failed");
       }
     }
@@ -71,14 +73,15 @@ export const runFullAnalysisPipeline = async (sourceData: {
     while (analysisStatus !== "completed" && analysisStatus !== "failed") {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
       const { data: statusData } = await checkTaskStatus(analysisTaskId);
-      analysisStatus = statusData?.status || "pending";
+      const response = statusData as TaskStatusResponse;
+      analysisStatus = response?.status || "pending";
       
-      if (statusData?.status === "completed") {
+      if (response?.status === "completed") {
         toast.success("Data analysis completed");
         break;
       }
       
-      if (statusData?.status === "failed") {
+      if (response?.status === "failed") {
         throw new Error("Data analysis failed");
       }
     }
@@ -95,14 +98,15 @@ export const runFullAnalysisPipeline = async (sourceData: {
     while (dashboardStatus !== "completed" && dashboardStatus !== "failed") {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
       const { data: statusData } = await checkTaskStatus(dashboardTaskId);
-      dashboardStatus = statusData?.status || "pending";
+      const response = statusData as TaskStatusResponse;
+      dashboardStatus = response?.status || "pending";
       
-      if (statusData?.status === "completed") {
+      if (response?.status === "completed") {
         toast.success("Dashboard generation completed");
         break;
       }
       
-      if (statusData?.status === "failed") {
+      if (response?.status === "failed") {
         throw new Error("Dashboard generation failed");
       }
     }

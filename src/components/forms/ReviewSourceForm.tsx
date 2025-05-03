@@ -56,17 +56,19 @@ export function ReviewSourceForm({
     
     if (projectId) {
       try {
+        const metadata = {
+          project_id: projectId,
+          platforms: values.platforms,
+          product_name: values.productName,
+          min_rating: values.minRating,
+          timeframe: values.timeframe
+        };
+        
         await createDataSource(
           values.name,
           `https://api.reviews.com/${values.platforms[0].toLowerCase()}`,
           "reviews",
-          { 
-            project_id: projectId,
-            platforms: values.platforms,
-            product_name: values.productName,
-            min_rating: values.minRating,
-            timeframe: values.timeframe
-          }
+          metadata
         );
       } catch (error) {
         console.error("Error creating review data source:", error);

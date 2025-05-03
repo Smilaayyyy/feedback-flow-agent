@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { getDataSources, updateDataSourceStatus } from "@/services/agentService";
-import type { CollectionStatus } from "@/services/agentService";
+import { CollectionStatus } from "@/services/api/taskService";
 
 type DataSource = {
   id: string;

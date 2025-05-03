@@ -8,4 +8,12 @@ export const checkTaskStatus = async (taskId: string) => {
 };
 
 // Export types
-export type CollectionStatus = "pending" | "collecting" | "processing" | "analyzing" | "completed" | "failed";
+export type CollectionStatus = "pending" | "collecting" | "processing" | "analyzing" | "completed" | "failed" | "error";
+
+// Define a type for task status response
+export interface TaskStatusResponse {
+  status: CollectionStatus;
+  message?: string;
+  sources?: any[];
+  [key: string]: any;
+}

@@ -9,6 +9,7 @@ import {
   generateDashboard,
   runFullAnalysisPipeline
 } from "./api";
+import { CollectionStatus, TaskStatusResponse } from "./api/taskService";
 
 export type AgentType = "form" | "social" | "review";
 export type DataSourceType = "forum" | "website" | "social" | "survey" | "reviews";
@@ -19,8 +20,8 @@ export const createDataSource = async (
   name: string,
   url: string,
   type: DataSourceType,
-  projectId: string,
-  metadata: Record<string, any> = {}
+  metadata: Record<string, any> = {},
+  projectId?: string
 ) => {
   try {
     console.log("Creating data source:", { name, url, type, projectId, metadata });
@@ -36,7 +37,7 @@ export const createDataSource = async (
     // Prepare full metadata with project ID
     const fullMetadata = {
       ...metadata,
-      project_id: projectId
+      project_id: projectId || metadata.project_id
     };
     
     // Insert data source into Supabase
@@ -48,7 +49,7 @@ export const createDataSource = async (
           url, 
           type, 
           metadata: fullMetadata, 
-          project_id: projectId,
+          project_id: projectId || metadata.project_id,
           status: "pending" 
         }
       ])
@@ -271,7 +272,7 @@ const triggerCollectionApi = async (dataSource: any) => {
       config: {
         [dataSource.type]: {
           url: dataSource.url,
-          ...dataSource.metadata
+          ...(dataSource.metadata || {})
         }
       }
     };
@@ -292,7 +293,7 @@ const triggerCollectionApi = async (dataSource: any) => {
     if (data?.task_id) {
       // Store task ID in metadata
       const updatedMetadata = { 
-        ...dataSource.metadata, 
+        ...(dataSource.metadata || {}), 
         task_id: data.task_id 
       };
       
@@ -317,7 +318,8 @@ const triggerCollectionApi = async (dataSource: any) => {
         console.log("Task status data:", statusData);
         
         if (statusData) {
-          const status = statusData.status;
+          const response = statusData as TaskStatusResponse;
+          const status = response.status;
           
           // Update metadata with latest task status
           const updatedTaskMetadata = {
@@ -344,7 +346,7 @@ const triggerCollectionApi = async (dataSource: any) => {
               // Store final results in metadata
               const finalMetadata = {
                 ...updatedTaskMetadata,
-                sources: statusData.sources,
+                sources: response.sources,
                 completion_time: new Date().toISOString()
               };
               
@@ -362,7 +364,7 @@ const triggerCollectionApi = async (dataSource: any) => {
               // Store error information
               const errorMetadata = {
                 ...updatedTaskMetadata,
-                error_message: statusData.message,
+                error_message: response.message,
                 error_time: new Date().toISOString()
               };
               
@@ -372,7 +374,7 @@ const triggerCollectionApi = async (dataSource: any) => {
                 .eq("id", dataSource.id);
                 
               clearInterval(pollIntervalId);
-              toast.error(`Error processing "${dataSource.name}": ${statusData.message}`);
+              toast.error(`Error processing "${dataSource.name}": ${response.message}`);
               break;
             default:
               // For any other status, just update the metadata
@@ -389,7 +391,8 @@ const triggerCollectionApi = async (dataSource: any) => {
         clearInterval(pollIntervalId);
         // Check if status is still not completed or error
         checkTaskStatus(data.task_id).then(async ({ data: finalStatus }) => {
-          if (finalStatus && (finalStatus.status !== "completed" && finalStatus.status !== "error")) {
+          const response = finalStatus as TaskStatusResponse;
+          if (response && (response.status !== "completed" && response.status !== "error")) {
             // If still not completed after timeout, mark as error
             await updateDataSourceStatus(dataSource.id, "error");
             
@@ -420,7 +423,7 @@ const triggerCollectionApi = async (dataSource: any) => {
     await updateDataSourceStatus(dataSource.id, "error");
     
     const errorMetadata = { 
-      ...dataSource.metadata, 
+      ...(dataSource.metadata || {}), 
       error_message: error.message,
       error_time: new Date().toISOString()
     };

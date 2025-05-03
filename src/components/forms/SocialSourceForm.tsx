@@ -48,16 +48,18 @@ export function SocialSourceForm({
     // Add projectId to the source data if available
     if (projectId) {
       try {
+        const metadata = { 
+          project_id: projectId,
+          platform: values.platform,
+          keywords: values.keywords,
+          timeframe: values.timeframe
+        };
+        
         await createDataSource(
           values.name,
           `https://api.socialmedia.com/${values.platform}`,
           "social",
-          { 
-            project_id: projectId,
-            platform: values.platform,
-            keywords: values.keywords,
-            timeframe: values.timeframe
-          }
+          metadata
         );
       } catch (error) {
         console.error("Error creating social data source:", error);
