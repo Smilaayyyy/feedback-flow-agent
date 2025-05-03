@@ -50,13 +50,15 @@ export function DataSourceForm({
     setProgress(25);
     
     try {
-      // Create the data source with the correct parameters
+      // Create the data source with the correct parameters - fixed the metadata parameter type
       const { data, error } = await createDataSource(
         values.name,
         values.apiUrl || "https://api.example.com/data",
         "forum", // Using forum as the default type for form/api data
-        projectId, // Pass the project ID directly as a string
-        { sourceType: values.sourceType } // Add additional metadata
+        { 
+          sourceType: values.sourceType,
+          project_id: projectId 
+        } // Pass metadata as an object, not a string
       );
       
       if (error) {

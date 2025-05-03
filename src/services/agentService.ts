@@ -1,3 +1,4 @@
+
 // src/services/agentService.ts
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -292,8 +293,9 @@ const triggerCollectionApi = async (dataSource: any) => {
     // If task ID is returned, start polling for status
     if (data?.task_id) {
       // Store task ID in metadata
+      // Fix: Create a proper object for updatedMetadata
       const updatedMetadata = { 
-        ...(dataSource.metadata || {}), 
+        ...Object.assign({}, dataSource.metadata || {}), 
         task_id: data.task_id 
       };
       
@@ -322,8 +324,9 @@ const triggerCollectionApi = async (dataSource: any) => {
           const status = response.status;
           
           // Update metadata with latest task status
+          // Fix: Use Object.assign to ensure we're spreading an object
           const updatedTaskMetadata = {
-            ...updatedMetadata,
+            ...Object.assign({}, updatedMetadata),
             task_status: status,
             task_updated: new Date().toISOString()
           };
@@ -423,7 +426,7 @@ const triggerCollectionApi = async (dataSource: any) => {
     await updateDataSourceStatus(dataSource.id, "error");
     
     const errorMetadata = { 
-      ...(dataSource.metadata || {}), 
+      ...(typeof dataSource.metadata === 'object' ? dataSource.metadata : {}), 
       error_message: error.message,
       error_time: new Date().toISOString()
     };
