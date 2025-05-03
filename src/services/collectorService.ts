@@ -1,7 +1,7 @@
 
 import { toast } from "sonner";
 
-const API_BASE_URL = "http://0.0.0.0:8000/api/v1";
+const API_BASE_URL = "https://ai-feedback-agrregator.onrender.com/api/v1";
 
 // Function to send data to collector agent
 export const sendToCollector = async (
