@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import StatusCard from "@/components/StatusCard";
-import { fetchDashboardData, fetchReportData } from "@/services/collectorService";
+import { fetchDashboardData, fetchReportData } from "@/services/api/dashboardService";
 import { supabase } from "@/integrations/supabase/client";
 
 type DashboardProps = {

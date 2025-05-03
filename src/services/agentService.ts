@@ -1,4 +1,3 @@
-
 // src/services/agentService.ts
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -9,12 +8,11 @@ import {
   analyzeProcessedData,
   generateDashboard,
   runFullAnalysisPipeline
-} from "./collectorService";
+} from "./api";
 
 export type AgentType = "form" | "social" | "review";
 export type DataSourceType = "forum" | "website" | "social" | "survey" | "reviews";
-
-export type CollectionStatus = "pending" | "collecting" | "processing" | "analyzing" | "completed" | "error";
+export type { CollectionStatus } from "./api/taskService";
 
 // Function to create a new data source and trigger the appropriate collector agent
 export const createDataSource = async (
