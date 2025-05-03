@@ -212,6 +212,30 @@ export const fetchDashboardHtml = async (taskId: string) => {
   }
 };
 
+// Function to fetch dashboard data
+export const fetchDashboardData = async (taskId: string) => {
+  try {
+    // First get the HTML content
+    const htmlResponse = await fetch(`${API_BASE_URL}/dashboard/${taskId}/html`);
+    
+    if (!htmlResponse.ok) {
+      const errorText = await htmlResponse.text();
+      throw new Error(`Failed to fetch dashboard HTML: ${errorText}`);
+    }
+    
+    const html = await htmlResponse.text();
+    
+    return { 
+      data: { html }, 
+      error: null 
+    };
+  } catch (error: any) {
+    console.error("Error fetching dashboard HTML:", error);
+    toast.error("Failed to fetch dashboard");
+    return { data: null, error };
+  }
+};
+
 // Function to fetch report data
 export const fetchReportData = async (dashboardTaskId: string) => {
   try {

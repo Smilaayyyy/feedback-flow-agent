@@ -36,9 +36,16 @@ export function DashboardContent({ projectId, dataSourceId }: DashboardProps) {
       
       if (error) throw error;
       
-      if (data && data.status === "completed" && data.metadata?.task_id) {
-        setTaskId(data.metadata.task_id);
-        loadDashboardData(data.metadata.task_id);
+      // Safely extract task_id from metadata
+      const metadataObj = typeof data.metadata === 'string' 
+        ? JSON.parse(data.metadata) 
+        : data.metadata;
+      
+      const taskId = metadataObj?.task_id;
+      
+      if (data && data.status === "completed" && taskId) {
+        setTaskId(taskId);
+        loadDashboardData(taskId);
       } else {
         setIsLoading(false);
         setDashboardHtml("<div>No dashboard data available yet.</div>");
@@ -64,9 +71,21 @@ export function DashboardContent({ projectId, dataSourceId }: DashboardProps) {
       
       if (error) throw error;
       
-      if (data && data.length > 0 && data[0].metadata?.task_id) {
-        setTaskId(data[0].metadata.task_id);
-        loadDashboardData(data[0].metadata.task_id);
+      if (data && data.length > 0) {
+        // Safely extract task_id from metadata
+        const metadataObj = typeof data[0].metadata === 'string' 
+          ? JSON.parse(data[0].metadata) 
+          : data[0].metadata;
+        
+        const taskId = metadataObj?.task_id;
+        
+        if (taskId) {
+          setTaskId(taskId);
+          loadDashboardData(taskId);
+        } else {
+          setIsLoading(false);
+          setDashboardHtml("<div>No completed data sources found.</div>");
+        }
       } else {
         setIsLoading(false);
         setDashboardHtml("<div>No completed data sources found.</div>");
