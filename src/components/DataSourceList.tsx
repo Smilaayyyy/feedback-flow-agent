@@ -35,7 +35,6 @@ export function DataSourceList({
 }: DataSourceListProps) {
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [runningAnalysis, setRunningAnalysis] = useState<string | null>(null);
 
   useEffect(() => {
     loadDataSources();
@@ -55,37 +54,8 @@ export function DataSourceList({
     setIsLoading(false);
   };
 
-  const handleRunAnalysis = async (sourceId: string) => {
-    setRunningAnalysis(sourceId);
-    
-    try {
-      // Update status to processing
-      await updateDataSourceStatus(sourceId, "processing");
-      
-      // In a production environment, this would call your FastAPI endpoint
-      // Example API call:
-      /*
-      const response = await fetch('http://your-api-url/api/v1/analyze/sourceId', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      */
-      
-      // Simulate analysis process
-      setTimeout(async () => {
-        await updateDataSourceStatus(sourceId, "completed");
-        if (onRunAnalysis) onRunAnalysis(sourceId);
-        toast.success("Analysis completed successfully");
-        loadDataSources();
-      }, 2000);
-    } catch (error) {
-      console.error("Error running analysis:", error);
-      toast.error("Failed to run analysis");
-    } finally {
-      setRunningAnalysis(null);
-    }
+  const handleViewDashboard = async (sourceId: string) => {
+    if (onRunAnalysis) onRunAnalysis(sourceId);
   };
 
   const handleDelete = async (sourceId: string) => {
@@ -191,11 +161,10 @@ export function DataSourceList({
                 {source.status === 'completed' && (
                   <Button 
                     variant="outline" 
-                    size="sm" 
-                    disabled={runningAnalysis === source.id}
-                    onClick={() => handleRunAnalysis(source.id)}
+                    size="sm"
+                    onClick={() => handleViewDashboard(source.id)}
                   >
-                    {runningAnalysis === source.id ? "Running..." : "Run Analysis"}
+                    View Dashboard
                   </Button>
                 )}
                 {onDelete && (

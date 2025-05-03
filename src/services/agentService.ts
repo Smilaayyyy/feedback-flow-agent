@@ -1,5 +1,7 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { sendToCollector, checkTaskStatus } from "./collectorService";
 
 export type AgentType = "form" | "social" | "review";
 export type DataSourceType = "forum" | "social" | "survey" | "reviews";
@@ -190,38 +192,73 @@ const triggerCollectionApi = async (dataSource: any) => {
     // First, update the status to collecting
     await updateDataSourceStatus(dataSource.id, "collecting");
     
-    // In a production environment, this would call your FastAPI endpoint
-    // For demonstration, we'll simulate the API call with a timeout
+    // Create the request payload based on data source type
+    const payload = {
+      source_id: dataSource.id,
+      config: {
+        [dataSource.type]: {
+          url: dataSource.url,
+          ...dataSource.metadata
+        }
+      }
+    };
+
+    // Send data to collector service
+    const { data, error } = await sendToCollector(payload, dataSource.type === 'survey');
     
-    // Example API call structure:
-    /*
-    const response = await fetch('http://your-api-url/api/v1/collect', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        config: {
-          social: {
-            platform: dataSource.metadata?.platform || 'Twitter',
-            hashtags: dataSource.metadata?.hashtags || [],
-          },
-          review: {
-            websites: [dataSource.metadata?.platform || 'Google'],
-          },
-          survey: {
-            form_id: dataSource.id,
-            api_endpoints: [dataSource.url],
+    if (error) throw error;
+    
+    // If task ID is returned, start polling for status
+    if (data?.task_id) {
+      // Store task ID in metadata
+      await supabase
+        .from("data_sources")
+        .update({ 
+          metadata: { 
+            ...dataSource.metadata, 
+            task_id: data.task_id 
+          } 
+        })
+        .eq("id", dataSource.id);
+      
+      // Poll for status every 5 seconds
+      const pollIntervalId = setInterval(async () => {
+        const { data: statusData } = await checkTaskStatus(data.task_id);
+        
+        if (statusData) {
+          const status = statusData.status;
+          
+          switch (status) {
+            case "collecting":
+              await updateDataSourceStatus(dataSource.id, "collecting");
+              break;
+            case "processing":
+              await updateDataSourceStatus(dataSource.id, "processing");
+              break;
+            case "analyzing":
+              await updateDataSourceStatus(dataSource.id, "analyzing");
+              break;
+            case "completed":
+              await updateDataSourceStatus(dataSource.id, "completed");
+              clearInterval(pollIntervalId);
+              toast.success(`Data collection completed for "${dataSource.name}"`);
+              break;
+            case "error":
+              await updateDataSourceStatus(dataSource.id, "error");
+              clearInterval(pollIntervalId);
+              toast.error(`Error processing "${dataSource.name}"`);
+              break;
           }
         }
-      }),
-    });
-    
-    const responseData = await response.json();
-    */
-    
-    // For now, just simulate the collection process
-    await simulateAgentProcess(dataSource);
+      }, 5000);
+      
+      // Clear interval after 10 minutes (failsafe)
+      setTimeout(() => {
+        clearInterval(pollIntervalId);
+      }, 600000);
+      
+      return { success: true, task_id: data.task_id };
+    }
     
     return { success: true };
   } catch (error) {
@@ -231,7 +268,7 @@ const triggerCollectionApi = async (dataSource: any) => {
   }
 };
 
-// This simulates the collection process - in a real app this would be done by your FastAPI backend
+// For development only: Simulates the collection process
 const simulateAgentProcess = async (dataSource: any) => {
   // Update status to collecting
   await updateDataSourceStatus(dataSource.id, "collecting");

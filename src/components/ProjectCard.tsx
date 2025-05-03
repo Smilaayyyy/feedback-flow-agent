@@ -36,8 +36,20 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
     day: 'numeric' 
   }).format(new Date(created_at));
   
-  const completedSources = data_sources?.filter(source => source.status === 'completed').length || 0;
-  const totalSources = data_sources?.length || 0;
+  // Get collection names from data sources
+  const getCollectionNames = () => {
+    if (data_sources.length === 0) return "No collections";
+    
+    const typeCount = data_sources.reduce((acc, source) => {
+      const type = source.type;
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(typeCount)
+      .map(([type, count]) => `${count} ${type}${count > 1 ? 's' : ''}`)
+      .join(', ');
+  };
   
   return (
     <Card className="animate-fade-in">
@@ -47,15 +59,15 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
             <CardTitle>{name}</CardTitle>
             <CardDescription>Created on {formattedDate}</CardDescription>
           </div>
-          <Badge variant={totalSources > 0 ? "default" : "outline"}>
-            {completedSources} / {totalSources} Sources
+          <Badge variant={data_sources.length > 0 ? "default" : "outline"}>
+            {getCollectionNames()}
           </Badge>
         </div>
       </CardHeader>
       <CardContent>
         <div className="grid gap-2">
           <div className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Data Sources:</span> {totalSources}
+            <span className="font-medium text-foreground">Collections:</span> {getCollectionNames()}
           </div>
           {description && (
             <div className="text-sm text-muted-foreground mt-2 line-clamp-2">
