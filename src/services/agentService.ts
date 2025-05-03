@@ -1,10 +1,17 @@
-
+// src/services/agentService.ts
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { sendToCollector, checkTaskStatus } from "./collectorService";
+import { 
+  sendToCollector, 
+  checkTaskStatus, 
+  processCollectedData,
+  analyzeProcessedData,
+  generateDashboard,
+  runFullAnalysisPipeline
+} from "./collectorService";
 
 export type AgentType = "form" | "social" | "review";
-export type DataSourceType = "forum" | "social" | "survey" | "reviews";
+export type DataSourceType = "forum" | "website" | "social" | "survey" | "reviews";
 
 export type CollectionStatus = "pending" | "collecting" | "processing" | "analyzing" | "completed" | "error";
 
@@ -13,6 +20,7 @@ export const createDataSource = async (
   name: string,
   url: string,
   type: DataSourceType,
+  projectId: string,
   metadata: Record<string, any> = {}
 ) => {
   try {
@@ -24,18 +32,32 @@ export const createDataSource = async (
       };
     }
     
+    // Prepare full metadata with project ID
+    const fullMetadata = {
+      ...metadata,
+      project_id: projectId
+    };
+    
     // Insert data source into Supabase
     const { data, error } = await supabase
       .from("data_sources")
       .insert([
-        { name, url, type, metadata, project_id: metadata.project_id || null }
+        { 
+          name, 
+          url, 
+          type, 
+          metadata: fullMetadata, 
+          project_id: projectId,
+          status: "pending" 
+        }
       ])
-      .select("*, collector_agents(*)");
+      .select();
     
     if (error) throw error;
     
     // Successfully created data source
     const dataSource = data[0];
+    toast.success(`Data source "${name}" created successfully`);
     
     // Trigger the API endpoint for data collection
     await triggerCollectionApi(dataSource);
@@ -43,7 +65,7 @@ export const createDataSource = async (
     return { data: dataSource, error: null };
   } catch (error: any) {
     console.error("Error creating data source:", error);
-    toast.error("Failed to create data source");
+    toast.error(`Failed to create data source: ${error.message}`);
     return { data: null, error };
   }
 };
@@ -65,6 +87,10 @@ const isValidUrl = (url: string, type: DataSourceType): boolean => {
         // Forums can be on various domains, just ensure it has a valid protocol
         return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
       
+      case "website":
+        // Websites should have valid HTTP/HTTPS protocol
+        return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+      
       case "reviews":
         const allowedReviewDomains = [
           "trustpilot.com", "yelp.com", "google.com", "tripadvisor.com", "amazon.com"
@@ -75,7 +101,8 @@ const isValidUrl = (url: string, type: DataSourceType): boolean => {
         const allowedSurveyDomains = [
           "surveymonkey.com", "typeform.com", "google.com", "forms.office.com", "qualtrics.com"
         ];
-        return allowedSurveyDomains.some(domain => urlObj.hostname.includes(domain));
+        return allowedSurveyDomains.some(domain => urlObj.hostname.includes(domain)) || 
+               (urlObj.protocol === 'http:' || urlObj.protocol === 'https:');
       
       default:
         return true;
@@ -91,7 +118,7 @@ export const getDataSources = async (projectId?: string) => {
   try {
     let query = supabase
       .from("data_sources")
-      .select("*, collector_agents(name, type)");
+      .select("*");
     
     // If project ID is provided, filter by project ID
     if (projectId) {
@@ -114,7 +141,10 @@ export const updateDataSourceStatus = async (id: string, status: CollectionStatu
   try {
     const { data, error } = await supabase
       .from("data_sources")
-      .update({ status })
+      .update({ 
+        status,
+        last_updated: new Date().toISOString()  
+      })
       .eq("id", id)
       .select();
     
@@ -153,6 +183,7 @@ export const createProject = async (name: string, description?: string) => {
     }
     
     console.log("Project created successfully:", data[0]);
+    toast.success(`Project "${name}" created successfully`);
     return { data: data[0], error: null };
   } catch (error: any) {
     console.error("Error creating project:", error);
@@ -172,7 +203,8 @@ export const getProjects = async () => {
           id,
           name,
           type,
-          status
+          status,
+          last_updated
         )
       `)
       .order("created_at", { ascending: false });
@@ -182,6 +214,35 @@ export const getProjects = async () => {
     return { data, error: null };
   } catch (error: any) {
     console.error("Error fetching projects:", error);
+    return { data: null, error };
+  }
+};
+
+// Function to get a single project by ID with its data sources
+export const getProjectById = async (projectId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from("projects")
+      .select(`
+        *,
+        data_sources (
+          id,
+          name,
+          url,
+          type,
+          status,
+          last_updated,
+          metadata
+        )
+      `)
+      .eq("id", projectId)
+      .single();
+    
+    if (error) throw error;
+    
+    return { data, error: null };
+  } catch (error: any) {
+    console.error(`Error fetching project with ID ${projectId}:`, error);
     return { data: null, error };
   }
 };
@@ -211,22 +272,35 @@ const triggerCollectionApi = async (dataSource: any) => {
     // If task ID is returned, start polling for status
     if (data?.task_id) {
       // Store task ID in metadata
+      const updatedMetadata = { 
+        ...dataSource.metadata, 
+        task_id: data.task_id 
+      };
+      
       await supabase
         .from("data_sources")
-        .update({ 
-          metadata: { 
-            ...dataSource.metadata, 
-            task_id: data.task_id 
-          } 
-        })
+        .update({ metadata: updatedMetadata })
         .eq("id", dataSource.id);
       
       // Poll for status every 5 seconds
       const pollIntervalId = setInterval(async () => {
-        const { data: statusData } = await checkTaskStatus(data.task_id);
+        const { data: statusData, error: statusError } = await checkTaskStatus(data.task_id);
+        
+        if (statusError) {
+          console.error("Error checking task status:", statusError);
+          // If there's an error checking status, don't update the status yet
+          return;
+        }
         
         if (statusData) {
           const status = statusData.status;
+          
+          // Update metadata with latest task status
+          const updatedTaskMetadata = {
+            ...updatedMetadata,
+            task_status: status,
+            task_updated: new Date().toISOString()
+          };
           
           switch (status) {
             case "collecting":
@@ -240,14 +314,46 @@ const triggerCollectionApi = async (dataSource: any) => {
               break;
             case "completed":
               await updateDataSourceStatus(dataSource.id, "completed");
+              
+              // Store final results in metadata
+              const finalMetadata = {
+                ...updatedTaskMetadata,
+                sources: statusData.sources,
+                completion_time: new Date().toISOString()
+              };
+              
+              await supabase
+                .from("data_sources")
+                .update({ metadata: finalMetadata })
+                .eq("id", dataSource.id);
+                
               clearInterval(pollIntervalId);
               toast.success(`Data collection completed for "${dataSource.name}"`);
               break;
             case "error":
               await updateDataSourceStatus(dataSource.id, "error");
+              
+              // Store error information
+              const errorMetadata = {
+                ...updatedTaskMetadata,
+                error_message: statusData.message,
+                error_time: new Date().toISOString()
+              };
+              
+              await supabase
+                .from("data_sources")
+                .update({ metadata: errorMetadata })
+                .eq("id", dataSource.id);
+                
               clearInterval(pollIntervalId);
-              toast.error(`Error processing "${dataSource.name}"`);
+              toast.error(`Error processing "${dataSource.name}": ${statusData.message}`);
               break;
+            default:
+              // For any other status, just update the metadata
+              await supabase
+                .from("data_sources")
+                .update({ metadata: updatedTaskMetadata })
+                .eq("id", dataSource.id);
           }
         }
       }, 5000);
@@ -255,42 +361,102 @@ const triggerCollectionApi = async (dataSource: any) => {
       // Clear interval after 10 minutes (failsafe)
       setTimeout(() => {
         clearInterval(pollIntervalId);
+        // Check if status is still not completed or error
+        checkTaskStatus(data.task_id).then(async ({ data: finalStatus }) => {
+          if (finalStatus && (finalStatus.status !== "completed" && finalStatus.status !== "error")) {
+            // If still not completed after timeout, mark as error
+            await updateDataSourceStatus(dataSource.id, "error");
+            
+            const timeoutMetadata = { 
+              ...updatedMetadata,
+              error_message: "Collection timed out after 10 minutes",
+              error_time: new Date().toISOString()
+            };
+            
+            await supabase
+              .from("data_sources")
+              .update({ metadata: timeoutMetadata })
+              .eq("id", dataSource.id);
+              
+            toast.error(`Data collection timed out for "${dataSource.name}"`);
+          }
+        });
       }, 600000);
       
       return { success: true, task_id: data.task_id };
     }
     
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error triggering API collection:", error);
+    
+    // Update status and metadata with error information
     await updateDataSourceStatus(dataSource.id, "error");
-    return { success: false };
+    
+    const errorMetadata = { 
+      ...dataSource.metadata, 
+      error_message: error.message,
+      error_time: new Date().toISOString()
+    };
+    
+    await supabase
+      .from("data_sources")
+      .update({ metadata: errorMetadata })
+      .eq("id", dataSource.id);
+    
+    toast.error(`Failed to collect data for "${dataSource.name}": ${error.message}`);
+    return { success: false, error };
   }
 };
 
-// For development only: Simulates the collection process
-const simulateAgentProcess = async (dataSource: any) => {
-  // Update status to collecting
-  await updateDataSourceStatus(dataSource.id, "collecting");
-  
-  // Simulate collection process (2 seconds)
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Update status to processing
-  await updateDataSourceStatus(dataSource.id, "processing");
-  
-  // Simulate processing (2 seconds)
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Update status to analyzing
-  await updateDataSourceStatus(dataSource.id, "analyzing");
-  
-  // Simulate analysis (2 seconds)
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Update status to completed
-  await updateDataSourceStatus(dataSource.id, "completed");
-  
-  // Notify user of completion
-  toast.success(`Data collection completed for "${dataSource.name}"`);
+// Function to run the complete analysis pipeline on a data source
+export const runAnalysisPipeline = async (dataSourceId: string) => {
+  try {
+    // First, get the data source details
+    const { data: dataSource, error: fetchError } = await supabase
+      .from("data_sources")
+      .select("*")
+      .eq("id", dataSourceId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    if (!dataSource) throw new Error("Data source not found");
+    
+    // Run the full analysis pipeline
+    const result = await runFullAnalysisPipeline({
+      source_id: dataSourceId,
+      config: {
+        [dataSource.type]: {
+          url: dataSource.url,
+          ...dataSource.metadata
+        }
+      }
+    });
+    
+    if (!result.success) {
+      throw new Error(result.error?.message || "Pipeline failed");
+    }
+    
+    // Update the data source with success information
+    const updatedMetadata = {
+      ...dataSource.metadata,
+      pipeline_success: true,
+      task_ids: result.taskIds,
+      pipeline_completed: new Date().toISOString()
+    };
+    
+    await supabase
+      .from("data_sources")
+      .update({ 
+        metadata: updatedMetadata,
+        status: "completed"
+      })
+      .eq("id", dataSourceId);
+    
+    return { success: true, taskIds: result.taskIds };
+  } catch (error: any) {
+    console.error("Error running analysis pipeline:", error);
+    toast.error(`Analysis pipeline failed: ${error.message}`);
+    return { success: false, error };
+  }
 };
