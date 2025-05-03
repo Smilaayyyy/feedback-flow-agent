@@ -15,7 +15,7 @@ import { createDataSource } from "@/services/agentService";
 const dataSourceFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   sourceType: z.enum(["api", "file"]),
-  apiUrl: z.string().optional(),
+  apiUrl: z.string().url({ message: "Please enter a valid URL" }).optional().or(z.literal("")),
   file: z.any().optional(),
 });
 
@@ -36,44 +36,57 @@ export function DataSourceForm({
     defaultValues: {
       name: "",
       sourceType: "api",
+      apiUrl: "",
     },
   });
 
   const handleSubmit = async (values: DataSourceFormValues) => {
+    if (!projectId) {
+      toast.error("No project selected");
+      return;
+    }
+
     setCollectionStatus('collecting');
     setProgress(25);
     
-    // Add projectId to the source data
-    if (projectId) {
-      const sourceData = {
-        ...values,
-        projectId
-      };
+    try {
+      // Create the data source with the correct parameters
+      const { data, error } = await createDataSource(
+        values.name,
+        values.apiUrl || "https://api.example.com/data",
+        "forum", // Using forum as the default type for form/api data
+        projectId, // Pass the project ID directly as a string
+        { sourceType: values.sourceType } // Add additional metadata
+      );
       
-      try {
-        await createDataSource(
-          values.name,
-          values.apiUrl || "https://example.com/api",
-          "forum",
-          { project_id: projectId }
-        );
-      } catch (error) {
-        console.error("Error creating data source:", error);
+      if (error) {
+        throw error;
       }
-    }
-    
-    setTimeout(() => setProgress(50), 2000);
-    setTimeout(() => {
-      setProgress(75);
+      
+      // Update progress
+      setProgress(50);
       setCollectionStatus('processing');
-    }, 4000);
-    setTimeout(() => {
-      setProgress(100);
-      setCollectionStatus('completed');
-    }, 6000);
-
-    onSubmit(values);
-    toast.success("Data collection started");
+      
+      // Wait for a short period to show processing status
+      setTimeout(() => {
+        setProgress(75);
+      }, 2000);
+      
+      // Call onSubmit with the form values
+      onSubmit(values);
+      
+      // Complete the progress
+      setTimeout(() => {
+        setProgress(100);
+        setCollectionStatus('completed');
+        toast.success(`Data source "${values.name}" created and collection started`);
+      }, 4000);
+      
+    } catch (error: any) {
+      console.error("Error creating data source:", error);
+      setCollectionStatus('error');
+      toast.error(`Failed to create data source: ${error.message}`);
+    }
   };
 
   const handleFileBrowse = () => {
@@ -174,8 +187,23 @@ export function DataSourceForm({
           />
         )}
 
-        <Button type="submit" className="w-full" disabled={collectionStatus === 'collecting'}>
-          {collectionStatus === 'collecting' ? "Starting Collection..." : "Start Collection"}
+        <Button 
+          type="submit" 
+          className="w-full" 
+          disabled={collectionStatus !== 'idle'}
+        >
+          {collectionStatus === 'idle' 
+            ? "Start Collection" 
+            : collectionStatus === 'collecting' 
+              ? "Starting Collection..." 
+              : collectionStatus === 'processing' 
+                ? "Processing..." 
+                : collectionStatus === 'analyzing' 
+                  ? "Analyzing..." 
+                  : collectionStatus === 'completed' 
+                    ? "Completed" 
+                    : "Error"
+          }
         </Button>
 
         {collectionStatus !== 'idle' && (

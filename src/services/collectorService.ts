@@ -1,10 +1,10 @@
+
 // src/services/collectorService.ts
 import { toast } from "sonner";
 import { CollectionStatus } from "./agentService";
 
-const API_BASE_URL = "https://ai-feedback-agrregator.onrender.com/api/v1";
-// Uncomment this for local development
-// const API_BASE_URL = "http://localhost:8000/api/v1";
+// Change this to your actual agent API endpoint
+const API_BASE_URL = "http://0.0.0.0:8000/api/v1";
 
 // Interface for collection config
 interface CollectionConfig {
@@ -37,6 +37,7 @@ export const sendToCollector = async (
     
     // Convert the sourceData to the expected format for the API
     const apiPayload = {
+      source_id: sourceData.source_id,
       config: {
         social: {
           platform: sourceData.config.social?.url?.includes("twitter") || sourceData.config.social?.url?.includes("x.com") 
@@ -60,7 +61,8 @@ export const sendToCollector = async (
       }
     };
 
-    console.log("Sending to collector:", apiPayload);
+    console.log("Sending to collector API:", apiPayload);
+    console.log("API endpoint:", `${API_BASE_URL}${endpoint}`);
     
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: "POST",
@@ -72,15 +74,16 @@ export const sendToCollector = async (
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("API error response:", errorText);
       throw new Error(`Failed to send data: ${errorText}`);
     }
     
     const data = await response.json();
-    console.log("Collection response:", data);
+    console.log("Collection response from API:", data);
     return { data, error: null };
   } catch (error: any) {
     console.error("Error sending data to collector:", error);
-    toast.error("Failed to send data to collector agent");
+    toast.error(`Failed to send data to collector agent: ${error.message}`);
     return { data: null, error };
   }
 };
@@ -98,14 +101,17 @@ function determineReviewSite(url: string): string {
 // Function to check task status
 export const checkTaskStatus = async (taskId: string) => {
   try {
+    console.log("Checking task status for:", taskId);
     const response = await fetch(`${API_BASE_URL}/task/${taskId}`);
     
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("Task status error:", errorText);
       throw new Error(`Failed to check task status: ${errorText}`);
     }
     
     const data = await response.json();
+    console.log("Task status response:", data);
     return { data, error: null };
   } catch (error: any) {
     console.error("Error checking task status:", error);
@@ -196,6 +202,7 @@ export const generateDashboard = async (
 // Function to fetch dashboard HTML
 export const fetchDashboardHtml = async (taskId: string) => {
   try {
+    console.log("Fetching dashboard HTML for task:", taskId);
     const response = await fetch(`${API_BASE_URL}/dashboard/${taskId}/html`);
     
     if (!response.ok) {
@@ -215,6 +222,7 @@ export const fetchDashboardHtml = async (taskId: string) => {
 // Function to fetch dashboard data
 export const fetchDashboardData = async (taskId: string) => {
   try {
+    console.log("Fetching dashboard data for task:", taskId);
     // First get the HTML content
     const htmlResponse = await fetch(`${API_BASE_URL}/dashboard/${taskId}/html`);
     
@@ -239,6 +247,7 @@ export const fetchDashboardData = async (taskId: string) => {
 // Function to fetch report data
 export const fetchReportData = async (dashboardTaskId: string) => {
   try {
+    console.log("Fetching report data for task:", dashboardTaskId);
     const response = await fetch(`${API_BASE_URL}/report/${dashboardTaskId}`);
     
     if (!response.ok) {
@@ -247,6 +256,7 @@ export const fetchReportData = async (dashboardTaskId: string) => {
     }
     
     const data = await response.json();
+    console.log("Report data response:", data);
     return { data, error: null };
   } catch (error: any) {
     console.error("Error fetching report data:", error);

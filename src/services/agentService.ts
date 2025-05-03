@@ -1,3 +1,4 @@
+
 // src/services/agentService.ts
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,6 +25,8 @@ export const createDataSource = async (
   metadata: Record<string, any> = {}
 ) => {
   try {
+    console.log("Creating data source:", { name, url, type, projectId, metadata });
+    
     // Validate URL format
     if (!isValidUrl(url, type)) {
       return { 
@@ -53,14 +56,23 @@ export const createDataSource = async (
       ])
       .select();
     
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase error creating data source:", error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      throw new Error("No data returned after data source creation");
+    }
     
     // Successfully created data source
     const dataSource = data[0];
+    console.log("Data source created:", dataSource);
     toast.success(`Data source "${name}" created successfully`);
     
     // Trigger the API endpoint for data collection
-    await triggerCollectionApi(dataSource);
+    const triggerResult = await triggerCollectionApi(dataSource);
+    console.log("Trigger result:", triggerResult);
     
     return { data: dataSource, error: null };
   } catch (error: any) {
@@ -250,6 +262,8 @@ export const getProjectById = async (projectId: string) => {
 // This calls your FastAPI backend for data collection
 const triggerCollectionApi = async (dataSource: any) => {
   try {
+    console.log("Triggering collection API for data source:", dataSource);
+    
     // First, update the status to collecting
     await updateDataSourceStatus(dataSource.id, "collecting");
     
@@ -264,10 +278,17 @@ const triggerCollectionApi = async (dataSource: any) => {
       }
     };
 
+    console.log("Sending payload to collector:", payload);
+
     // Send data to collector service
     const { data, error } = await sendToCollector(payload, dataSource.type === 'survey');
     
-    if (error) throw error;
+    if (error) {
+      console.error("Error from collector service:", error);
+      throw error;
+    }
+    
+    console.log("Collector service response:", data);
     
     // If task ID is returned, start polling for status
     if (data?.task_id) {
@@ -282,8 +303,11 @@ const triggerCollectionApi = async (dataSource: any) => {
         .update({ metadata: updatedMetadata })
         .eq("id", dataSource.id);
       
+      console.log("Starting poll for task status with ID:", data.task_id);
+      
       // Poll for status every 5 seconds
       const pollIntervalId = setInterval(async () => {
+        console.log("Polling task status for:", data.task_id);
         const { data: statusData, error: statusError } = await checkTaskStatus(data.task_id);
         
         if (statusError) {
@@ -291,6 +315,8 @@ const triggerCollectionApi = async (dataSource: any) => {
           // If there's an error checking status, don't update the status yet
           return;
         }
+        
+        console.log("Task status data:", statusData);
         
         if (statusData) {
           const status = statusData.status;
@@ -301,6 +327,8 @@ const triggerCollectionApi = async (dataSource: any) => {
             task_status: status,
             task_updated: new Date().toISOString()
           };
+          
+          console.log("Task status:", status);
           
           switch (status) {
             case "collecting":

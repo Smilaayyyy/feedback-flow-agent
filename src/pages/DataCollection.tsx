@@ -8,7 +8,6 @@ import { mockUser } from "@/lib/mockData";
 import { DataSourceForm } from "@/components/forms/DataSourceForm";
 import { SocialSourceForm } from "@/components/forms/SocialSourceForm";
 import { ReviewSourceForm } from "@/components/forms/ReviewSourceForm";
-import DataSourceList from "@/components/DataSourceList";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -63,29 +62,11 @@ const DataCollection = () => {
   const handleSubmit = (values: any) => {
     console.log("Collection initiated with values:", values);
     setRefreshTrigger(prev => prev + 1);
-  };
-
-  const handleRunAnalysis = (sourceId: string) => {
-    console.log("Running analysis for source:", sourceId);
-    // In a real app, this would trigger an analysis process via your FastAPI endpoint
-    toast.success("Analysis request submitted!");
-  };
-
-  const handleDelete = async (sourceId: string) => {
-    try {
-      const { error } = await supabase
-        .from("data_sources")
-        .delete()
-        .eq("id", sourceId);
-      
-      if (error) throw error;
-      
-      toast.success("Data source removed successfully!");
-      setRefreshTrigger(prev => prev + 1);
-    } catch (error) {
-      console.error("Error deleting data source:", error);
-      toast.error("Failed to delete data source");
-    }
+    
+    // Navigate to dashboard after successful submission
+    setTimeout(() => {
+      navigate(`/dashboard?projectId=${projectId}`);
+    }, 7000);
   };
 
   return (
@@ -143,23 +124,6 @@ const DataCollection = () => {
                     />
                   </TabsContent>
                 </Tabs>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Data Sources</CardTitle>
-                <CardDescription>
-                  View and manage your data collection sources for this project
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DataSourceList 
-                  onRunAnalysis={handleRunAnalysis}
-                  onDelete={handleDelete}
-                  refreshTrigger={refreshTrigger}
-                  projectId={projectId}
-                />
               </CardContent>
             </Card>
           </div>
