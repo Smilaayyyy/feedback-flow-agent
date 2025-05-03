@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -129,6 +128,8 @@ export const updateDataSourceStatus = async (id: string, status: CollectionStatu
 // Function to create a new project
 export const createProject = async (name: string, description?: string) => {
   try {
+    console.log("Creating project:", { name, description });
+    
     const { data, error } = await supabase
       .from("projects")
       .insert([
@@ -136,12 +137,24 @@ export const createProject = async (name: string, description?: string) => {
       ])
       .select();
     
-    if (error) throw error;
+    if (error) {
+      console.error("Database error creating project:", error);
+      toast.error(`Failed to create project: ${error.message}`);
+      throw error;
+    }
     
+    if (!data || data.length === 0) {
+      const noDataError = new Error("No data returned after project creation");
+      console.error(noDataError);
+      toast.error("Failed to create project: No data returned");
+      throw noDataError;
+    }
+    
+    console.log("Project created successfully:", data[0]);
     return { data: data[0], error: null };
   } catch (error: any) {
     console.error("Error creating project:", error);
-    toast.error("Failed to create project");
+    toast.error(`Failed to create project: ${error.message || "Unknown error"}`);
     return { data: null, error };
   }
 };

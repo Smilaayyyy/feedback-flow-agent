@@ -69,7 +69,7 @@ export const mockProject: Project = {
   id: 'p-1',
   name: 'Customer Feedback Analysis',
   userId: '1',
-  dataSources: mockDataSources,
+  data_sources: mockDataSources, // Changed from dataSources to data_sources to match the type
   analysisResults: mockAnalysisResults,
   createdAt: new Date('2025-04-15T09:00:00'),
 };
