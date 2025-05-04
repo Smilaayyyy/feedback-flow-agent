@@ -1,124 +1,91 @@
-
+import { apiRequest } from "./baseApiService";
 import { toast } from "sonner";
-import { sendToCollector } from "./collectionService";
 import { checkTaskStatus, TaskStatusResponse } from "./taskService";
-import { processCollectedData, analyzeProcessedData } from "./processingService";
-import { generateDashboard } from "./dashboardService";
 
-// Function to run the entire pipeline from collection to dashboard
+// Function to run the entire pipeline from collection to dashboard via a single API endpoint
 export const runFullAnalysisPipeline = async (sourceData: {
   source_id: string;
   config: Record<string, any>;
 }) => {
   try {
-    // 1. Collect data
-    toast.info("Starting data collection...");
-    const { data: collectionData, error: collectionError } = await sendToCollector(sourceData);
-    if (collectionError) throw collectionError;
+    // Call the unified pipeline endpoint
+    toast.info("Starting analysis pipeline...");
+    const { data: pipelineData, error: pipelineError } = await apiRequest('/api/v1/pipeline', {
+      method: "POST",
+      body: JSON.stringify(sourceData)
+    });
     
-    const collectionTaskId = collectionData.task_id;
+    if (pipelineError) throw pipelineError;
     
-    // 2. Wait for collection to complete (poll status)
-    let collectionStatus = "pending";
-    while (collectionStatus !== "completed" && collectionStatus !== "failed") {
+    // Get the main pipeline task ID
+    const pipelineTaskId = pipelineData.task_id;
+    if (!pipelineTaskId) throw new Error("No task ID returned from pipeline");
+    
+    // Poll for pipeline status
+    let pipelineStatus = "pending";
+    const taskIds = {
+      pipeline: pipelineTaskId,
+      collection: null,
+      processing: null, 
+      analysis: null,
+      dashboard: null
+    };
+    
+    // Function to update UI based on pipeline stage
+    const updateStageStatus = (stage: string, taskId: string | null) => {
+      if (taskId) {
+        taskIds[stage] = taskId;
+        toast.info(`${capitalizeFirstLetter(stage)} stage started`);
+      }
+    };
+    
+    // Poll for status and update UI
+    while (pipelineStatus !== "completed" && pipelineStatus !== "failed") {
       await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-      const { data: statusData } = await checkTaskStatus(collectionTaskId);
+      const { data: statusData } = await checkTaskStatus(pipelineTaskId);
       const response = statusData as TaskStatusResponse;
-      collectionStatus = response?.status || "pending";
       
+      pipelineStatus = response?.status || "pending";
+      
+      // Update UI based on current stage
+      if (response?.current_stage) {
+        switch (response.current_stage) {
+          case "collection":
+            updateStageStatus("collection", response.collection_task_id);
+            break;
+          case "processing":
+            updateStageStatus("processing", response.processing_task_id);
+            break;
+          case "analysis":
+            updateStageStatus("analysis", response.analysis_task_id);
+            break;
+          case "dashboard":
+            updateStageStatus("dashboard", response.dashboard_task_id);
+            break;
+        }
+      }
+      
+      // Check for completion or failure
       if (response?.status === "completed") {
-        toast.success("Data collection completed");
+        toast.success("Analysis pipeline completed successfully");
+        
+        // Get all task IDs from the final response
+        if (response.collection_task_id) taskIds.collection = response.collection_task_id;
+        if (response.processing_task_id) taskIds.processing = response.processing_task_id;
+        if (response.analysis_task_id) taskIds.analysis = response.analysis_task_id;
+        if (response.dashboard_task_id) taskIds.dashboard = response.dashboard_task_id;
+        
         break;
       }
       
-      if (response?.status === "failed") {
-        throw new Error("Data collection failed");
-      }
-    }
-    
-    // 3. Process the collected data
-    toast.info("Processing collected data...");
-    const { data: processData, error: processError } = await processCollectedData(collectionTaskId);
-    if (processError) throw processError;
-    
-    const processTaskId = processData.task_id;
-    
-    // 4. Wait for processing to complete
-    let processStatus = "pending";
-    while (processStatus !== "completed" && processStatus !== "failed") {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-      const { data: statusData } = await checkTaskStatus(processTaskId);
-      const response = statusData as TaskStatusResponse;
-      processStatus = response?.status || "pending";
-      
-      if (response?.status === "completed") {
-        toast.success("Data processing completed");
-        break;
-      }
-      
-      if (response?.status === "failed") {
-        throw new Error("Data processing failed");
-      }
-    }
-    
-    // 5. Analyze the processed data
-    toast.info("Analyzing data...");
-    const { data: analysisData, error: analysisError } = await analyzeProcessedData(processTaskId);
-    if (analysisError) throw analysisError;
-    
-    const analysisTaskId = analysisData.task_id;
-    
-    // 6. Wait for analysis to complete
-    let analysisStatus = "pending";
-    while (analysisStatus !== "completed" && analysisStatus !== "failed") {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-      const { data: statusData } = await checkTaskStatus(analysisTaskId);
-      const response = statusData as TaskStatusResponse;
-      analysisStatus = response?.status || "pending";
-      
-      if (response?.status === "completed") {
-        toast.success("Data analysis completed");
-        break;
-      }
-      
-      if (response?.status === "failed") {
-        throw new Error("Data analysis failed");
-      }
-    }
-    
-    // 7. Generate dashboard
-    toast.info("Generating dashboard...");
-    const { data: dashboardData, error: dashboardError } = await generateDashboard(analysisTaskId);
-    if (dashboardError) throw dashboardError;
-    
-    const dashboardTaskId = dashboardData.task_id;
-    
-    // 8. Wait for dashboard generation to complete
-    let dashboardStatus = "pending";
-    while (dashboardStatus !== "completed" && dashboardStatus !== "failed") {
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-      const { data: statusData } = await checkTaskStatus(dashboardTaskId);
-      const response = statusData as TaskStatusResponse;
-      dashboardStatus = response?.status || "pending";
-      
-      if (response?.status === "completed") {
-        toast.success("Dashboard generation completed");
-        break;
-      }
-      
-      if (response?.status === "failed") {
-        throw new Error("Dashboard generation failed");
+      if (response?.status === "failed" || response?.status === "error") {
+        throw new Error(`Pipeline failed: ${response.message || "Unknown error"}`);
       }
     }
     
     return {
       success: true,
-      taskIds: {
-        collection: collectionTaskId,
-        processing: processTaskId,
-        analysis: analysisTaskId,
-        dashboard: dashboardTaskId
-      }
+      taskIds
     };
     
   } catch (error: any) {
@@ -127,3 +94,8 @@ export const runFullAnalysisPipeline = async (sourceData: {
     return { success: false, error };
   }
 };
+
+// Helper function to capitalize first letter
+function capitalizeFirstLetter(string: string): string {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
