@@ -1,7 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import StatusCard from "@/components/StatusCard";
 import { fetchDashboardData, fetchReportData } from "@/services/api/dashboardService";
+import { checkTaskStatus } from "@/services/api/taskService"; // Added the missing import
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/services/api/baseApiService";
