@@ -1,4 +1,3 @@
-
 // src/services/agentService.ts
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -8,7 +7,8 @@ import {
   processCollectedData,
   analyzeProcessedData,
   generateDashboard,
-  runFullAnalysisPipeline
+  runFullAnalysisPipeline,
+  runAnalysisPipeline
 } from "./api";
 import { CollectionStatus, TaskStatusResponse } from "./api/taskService";
 
@@ -276,7 +276,7 @@ const triggerCollectionApi = async (dataSource: any) => {
       config: {
         [dataSource.type]: {
           url: dataSource.url,
-          ...(dataSource.metadata || {})
+          ...(dataSource.metadata && typeof dataSource.metadata === 'object' ? dataSource.metadata : {})
         }
       }
     };
@@ -284,7 +284,7 @@ const triggerCollectionApi = async (dataSource: any) => {
     console.log("Sending payload to pipeline API:", payload);
 
     // Use the pipeline service instead of collector
-    const { data, error } = await runFullAnalysisPipeline(payload);
+    const { data, error } = await runAnalysisPipeline(payload);
     
     if (error) {
       console.error("Error from pipeline service:", error);
@@ -293,29 +293,21 @@ const triggerCollectionApi = async (dataSource: any) => {
     
     console.log("Pipeline service response:", data);
     
-    // If pipeline was successful, store task IDs in metadata
-    if (data?.success && data?.taskIds) {
-      // Store task IDs in metadata
+    // If pipeline was successful, store task ID in metadata
+    if (data?.task_id) {
+      // Store task ID in metadata
       let updatedMetadata = {};
       
       // Only spread if dataSource.metadata is an object
       if (dataSource.metadata && typeof dataSource.metadata === 'object') {
         updatedMetadata = { 
           ...dataSource.metadata, 
-          pipeline_task_id: data.taskIds.pipeline,
-          collection_task_id: data.taskIds.collection,
-          processing_task_id: data.taskIds.processing,
-          analysis_task_id: data.taskIds.analysis,
-          dashboard_task_id: data.taskIds.dashboard,
+          pipeline_task_id: data.task_id,
           pipeline_started: new Date().toISOString()
         };
       } else {
         updatedMetadata = { 
-          pipeline_task_id: data.taskIds.pipeline,
-          collection_task_id: data.taskIds.collection,
-          processing_task_id: data.taskIds.processing,
-          analysis_task_id: data.taskIds.analysis,
-          dashboard_task_id: data.taskIds.dashboard,
+          pipeline_task_id: data.task_id,
           pipeline_started: new Date().toISOString()
         };
       }
@@ -324,12 +316,16 @@ const triggerCollectionApi = async (dataSource: any) => {
         .from("data_sources")
         .update({ 
           metadata: updatedMetadata,
-          status: "completed" // Mark as completed since the pipeline handles all statuses
+          status: "collecting" // Mark as collecting since we're starting the pipeline
         })
         .eq("id", dataSource.id);
       
-      toast.success(`Analysis pipeline completed for "${dataSource.name}"`);
-      return { success: true, taskIds: data.taskIds };
+      toast.success(`Analysis pipeline started for "${dataSource.name}"`);
+      
+      // Start polling for pipeline status
+      pollPipelineStatus(dataSource.id, data.task_id);
+      
+      return { success: true, taskId: data.task_id };
     }
     
     return { success: true };
@@ -361,5 +357,114 @@ const triggerCollectionApi = async (dataSource: any) => {
     
     toast.error(`Pipeline failed for "${dataSource.name}": ${error.message}`);
     return { success: false, error };
+  }
+};
+
+// Function to poll pipeline status
+const pollPipelineStatus = async (dataSourceId: string, taskId: string) => {
+  try {
+    let isCompleted = false;
+    let attempts = 0;
+    const maxAttempts = 30; // Limit polling to avoid infinite loops
+    
+    while (!isCompleted && attempts < maxAttempts) {
+      // Wait for 10 seconds between checks
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      
+      // Check task status
+      const { data: statusData, error: statusError } = await checkTaskStatus(taskId);
+      
+      if (statusError) {
+        console.error("Error checking task status:", statusError);
+        break;
+      }
+      
+      if (!statusData) {
+        console.error("No status data returned");
+        break;
+      }
+      
+      const taskStatus = statusData as TaskStatusResponse;
+      console.log(`Pipeline status for task ${taskId}:`, taskStatus);
+      
+      // Update the data source status based on the task status
+      if (taskStatus.status) {
+        await updateDataSourceStatus(dataSourceId, taskStatus.status);
+        
+        // Update the metadata with additional task IDs if available
+        const { data: dataSource } = await supabase
+          .from("data_sources")
+          .select("metadata")
+          .eq("id", dataSourceId)
+          .single();
+          
+        let updatedMetadata = {};
+        
+        if (dataSource?.metadata && typeof dataSource.metadata === 'object') {
+          updatedMetadata = { ...dataSource.metadata };
+          
+          // Add task IDs if available
+          if (taskStatus.collection_task_id) {
+            updatedMetadata = { 
+              ...updatedMetadata, 
+              collection_task_id: taskStatus.collection_task_id 
+            };
+          }
+          
+          if (taskStatus.processing_task_id) {
+            updatedMetadata = { 
+              ...updatedMetadata, 
+              processing_task_id: taskStatus.processing_task_id 
+            };
+          }
+          
+          if (taskStatus.analysis_task_id) {
+            updatedMetadata = { 
+              ...updatedMetadata, 
+              analysis_task_id: taskStatus.analysis_task_id 
+            };
+          }
+          
+          if (taskStatus.dashboard_task_id) {
+            updatedMetadata = { 
+              ...updatedMetadata, 
+              dashboard_task_id: taskStatus.dashboard_task_id 
+            };
+          }
+          
+          // Update the current stage
+          if (taskStatus.current_stage) {
+            updatedMetadata = { 
+              ...updatedMetadata, 
+              current_stage: taskStatus.current_stage 
+            };
+          }
+          
+          await supabase
+            .from("data_sources")
+            .update({ metadata: updatedMetadata })
+            .eq("id", dataSourceId);
+        }
+      }
+      
+      // Check if the pipeline is completed or failed
+      if (taskStatus.status === "completed") {
+        toast.success(`Analysis completed for data source`);
+        isCompleted = true;
+      } else if (taskStatus.status === "failed" || taskStatus.status === "error") {
+        toast.error(`Analysis failed: ${taskStatus.message || "Unknown error"}`);
+        isCompleted = true;
+      }
+      
+      attempts++;
+    }
+    
+    if (attempts >= maxAttempts && !isCompleted) {
+      console.warn("Stopped polling - maximum attempts reached");
+      toast.warning("Status monitoring timed out. Check dashboard for updates.");
+    }
+  } catch (error: any) {
+    console.error("Error polling pipeline status:", error);
+    toast.error(`Error monitoring pipeline: ${error.message}`);
   }
 };
