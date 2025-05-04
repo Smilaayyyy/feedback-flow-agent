@@ -1,3 +1,4 @@
+
 // src/services/agentService.ts
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -292,9 +293,14 @@ const triggerCollectionApi = async (dataSource: any) => {
     // If task ID is returned, start polling for status
     if (data?.task_id) {
       // Store task ID in metadata
-      const updatedMetadata = typeof dataSource.metadata === 'object' && dataSource.metadata !== null ? 
-        { ...dataSource.metadata, task_id: data.task_id } :
-        { task_id: data.task_id };
+      let updatedMetadata = {};
+      
+      // Only spread if dataSource.metadata is an object
+      if (dataSource.metadata && typeof dataSource.metadata === 'object') {
+        updatedMetadata = { ...dataSource.metadata, task_id: data.task_id };
+      } else {
+        updatedMetadata = { task_id: data.task_id };
+      }
       
       await supabase
         .from("data_sources")
@@ -320,9 +326,21 @@ const triggerCollectionApi = async (dataSource: any) => {
           const response = statusData as TaskStatusResponse;
           const status = response.status;
           
-          const updatedTaskMetadata = typeof updatedMetadata === 'object' && updatedMetadata !== null ?
-            { ...updatedMetadata, task_status: status, task_updated: new Date().toISOString() } : 
-            { task_status: status, task_updated: new Date().toISOString() };
+          let updatedTaskMetadata = {};
+          
+          // Only spread if updatedMetadata is an object
+          if (updatedMetadata && typeof updatedMetadata === 'object') {
+            updatedTaskMetadata = { 
+              ...updatedMetadata, 
+              task_status: status, 
+              task_updated: new Date().toISOString() 
+            };
+          } else {
+            updatedTaskMetadata = { 
+              task_status: status, 
+              task_updated: new Date().toISOString() 
+            };
+          }
           
           console.log("Task status:", status);
           
@@ -343,7 +361,7 @@ const triggerCollectionApi = async (dataSource: any) => {
               let finalMetadata = {};
               
               // Only spread if updatedTaskMetadata is an object
-              if (typeof updatedTaskMetadata === 'object' && updatedTaskMetadata !== null) {
+              if (updatedTaskMetadata && typeof updatedTaskMetadata === 'object') {
                 finalMetadata = {
                   ...updatedTaskMetadata,
                   sources: response.sources, 
@@ -371,7 +389,7 @@ const triggerCollectionApi = async (dataSource: any) => {
               let errorMetadata = {};
               
               // Only spread if updatedTaskMetadata is an object
-              if (typeof updatedTaskMetadata === 'object' && updatedTaskMetadata !== null) {
+              if (updatedTaskMetadata && typeof updatedTaskMetadata === 'object') {
                 errorMetadata = {
                   ...updatedTaskMetadata,
                   error_message: response.message,
@@ -491,7 +509,7 @@ export const runAnalysisPipeline = async (dataSourceId: string) => {
       config: {
         [dataSource.type]: {
           url: dataSource.url,
-          ...dataSource.metadata
+          ...(dataSource.metadata && typeof dataSource.metadata === 'object' ? dataSource.metadata : {})
         }
       }
     });
@@ -501,12 +519,22 @@ export const runAnalysisPipeline = async (dataSourceId: string) => {
     }
     
     // Update the data source with success information
-    const updatedMetadata = {
-      ...dataSource.metadata,
-      pipeline_success: true,
-      task_ids: result.taskIds,
-      pipeline_completed: new Date().toISOString()
-    };
+    let updatedMetadata = {};
+    
+    if (dataSource.metadata && typeof dataSource.metadata === 'object') {
+      updatedMetadata = {
+        ...dataSource.metadata,
+        pipeline_success: true,
+        task_ids: result.taskIds,
+        pipeline_completed: new Date().toISOString()
+      };
+    } else {
+      updatedMetadata = {
+        pipeline_success: true,
+        task_ids: result.taskIds,
+        pipeline_completed: new Date().toISOString()
+      };
+    }
     
     await supabase
       .from("data_sources")
