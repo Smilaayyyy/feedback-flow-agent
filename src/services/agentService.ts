@@ -294,8 +294,8 @@ const triggerCollectionApi = async (dataSource: any) => {
     if (data?.task_id) {
       // Store task ID in metadata
       // Fix for spread error: Create a proper object for updatedMetadata
-      const updatedMetadata = dataSource.metadata ? 
-        { ...Object.assign({}, dataSource.metadata), task_id: data.task_id } :
+      const updatedMetadata = typeof dataSource.metadata === 'object' && dataSource.metadata !== null ? 
+        { ...dataSource.metadata, task_id: data.task_id } :
         { task_id: data.task_id };
       
       await supabase
@@ -323,8 +323,8 @@ const triggerCollectionApi = async (dataSource: any) => {
           const status = response.status;
           
           // Fix for spread error: Create proper object for updatedTaskMetadata
-          const updatedTaskMetadata = updatedMetadata ? 
-            { ...Object.assign({}, updatedMetadata), task_status: status, task_updated: new Date().toISOString() } : 
+          const updatedTaskMetadata = typeof updatedMetadata === 'object' && updatedMetadata !== null ?
+            { ...updatedMetadata, task_status: status, task_updated: new Date().toISOString() } : 
             { task_status: status, task_updated: new Date().toISOString() };
           
           console.log("Task status:", status);
@@ -343,8 +343,8 @@ const triggerCollectionApi = async (dataSource: any) => {
               await updateDataSourceStatus(dataSource.id, "completed");
               
               // Store final results in metadata
-              const finalMetadata = updatedTaskMetadata ? 
-                { ...Object.assign({}, updatedTaskMetadata), sources: response.sources, completion_time: new Date().toISOString() } : 
+              const finalMetadata = typeof updatedTaskMetadata === 'object' && updatedTaskMetadata !== null ? 
+                { ...updatedTaskMetadata, sources: response.sources, completion_time: new Date().toISOString() } : 
                 { sources: response.sources, completion_time: new Date().toISOString() };
               
               await supabase
@@ -359,8 +359,8 @@ const triggerCollectionApi = async (dataSource: any) => {
               await updateDataSourceStatus(dataSource.id, "error");
               
               // Store error information
-              const errorMetadata = updatedTaskMetadata ? 
-                { ...Object.assign({}, updatedTaskMetadata), error_message: response.message, error_time: new Date().toISOString() } : 
+              const errorMetadata = typeof updatedTaskMetadata === 'object' && updatedTaskMetadata !== null ? 
+                { ...updatedTaskMetadata, error_message: response.message, error_time: new Date().toISOString() } : 
                 { error_message: response.message, error_time: new Date().toISOString() };
               
               await supabase
@@ -415,8 +415,8 @@ const triggerCollectionApi = async (dataSource: any) => {
     // Update status and metadata with error information
     await updateDataSourceStatus(dataSource.id, "error");
     
-    const errorMetadata = typeof dataSource.metadata === 'object' ? 
-      { ...Object.assign({}, dataSource.metadata), error_message: error.message, error_time: new Date().toISOString() } : 
+    const errorMetadata = typeof dataSource.metadata === 'object' && dataSource.metadata !== null ? 
+      { ...dataSource.metadata, error_message: error.message, error_time: new Date().toISOString() } : 
       { error_message: error.message, error_time: new Date().toISOString() };
     
     await supabase
