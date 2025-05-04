@@ -8,6 +8,7 @@ interface PipelineResponse {
   task_id: string;
   status: string;
   message?: string;
+  dashboard_url?: string;
   [key: string]: any;
 }
 
@@ -17,11 +18,22 @@ export const runFullAnalysisPipeline = async (sourceData: {
   config: Record<string, any>;
 }) => {
   try {
+    // Format payload correctly
+    const sourceType = Object.keys(sourceData.config)[0];
+    const payload = {
+      source_id: sourceData.source_id,
+      config: {
+        [sourceType]: sourceData.config[sourceType]
+      }
+    };
+    
+    console.log("Sending formatted payload to pipeline API:", payload);
+    
     // Call the unified pipeline endpoint
     toast.info("Starting analysis pipeline...");
     const { data: pipelineData, error: pipelineError } = await apiRequest<PipelineResponse>('/api/v1/pipeline', {
       method: "POST",
-      body: JSON.stringify(sourceData)
+      body: JSON.stringify(payload)
     });
     
     if (pipelineError) throw pipelineError;
@@ -29,6 +41,9 @@ export const runFullAnalysisPipeline = async (sourceData: {
     // Get the main pipeline task ID
     const pipelineTaskId = pipelineData?.task_id;
     if (!pipelineTaskId) throw new Error("No task ID returned from pipeline");
+    
+    // Check if a dashboard URL was immediately returned
+    const dashboardUrl = pipelineData?.dashboard_url;
     
     // Poll for pipeline status
     let pipelineStatus = "pending";
@@ -84,6 +99,15 @@ export const runFullAnalysisPipeline = async (sourceData: {
         if (response.analysis_task_id) taskIds.analysis = response.analysis_task_id;
         if (response.dashboard_task_id) taskIds.dashboard = response.dashboard_task_id;
         
+        // Check if there's a dashboard URL in the final response
+        if (response.dashboard_url && !dashboardUrl) {
+          return {
+            success: true,
+            taskIds,
+            dashboardUrl: response.dashboard_url
+          };
+        }
+        
         break;
       }
       
@@ -94,7 +118,8 @@ export const runFullAnalysisPipeline = async (sourceData: {
     
     return {
       success: true,
-      taskIds
+      taskIds,
+      dashboardUrl
     };
     
   } catch (error: any) {

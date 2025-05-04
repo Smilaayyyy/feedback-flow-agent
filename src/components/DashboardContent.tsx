@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import StatusCard from "@/components/StatusCard";
@@ -18,6 +17,7 @@ export function DashboardContent({ projectId, dataSourceId }: DashboardProps) {
   const [dashboardHtml, setDashboardHtml] = useState<string | null>(null);
   const [kpis, setKpis] = useState<any[]>([]);
   const [taskId, setTaskId] = useState<string | null>(null);
+  const [dashboardUrl, setDashboardUrl] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [requestsLog, setRequestsLog] = useState<string[]>([]);
 
@@ -60,18 +60,35 @@ export function DashboardContent({ projectId, dataSourceId }: DashboardProps) {
       setDebugInfo({ dataSource: data });
       addRequestLog(`Data source details retrieved with status: ${data.status}`);
       
-      // Safely extract task_id from metadata
+      // Safely extract task_id and dashboard_url from metadata
       const metadataObj = typeof data.metadata === 'string' 
         ? JSON.parse(data.metadata) 
         : data.metadata;
       
-      const taskId = metadataObj?.task_id;
-      console.log("Extracted task_id:", taskId);
-      addRequestLog(`Extracted task_id: ${taskId}`);
+      const taskId = metadataObj?.task_id || metadataObj?.pipeline_task_id;
+      const dashboardUrl = metadataObj?.dashboard_url;
       
-      if (data && data.status === "completed" && taskId) {
-        setTaskId(taskId);
-        loadDashboardData(taskId);
+      console.log("Extracted task_id:", taskId);
+      console.log("Extracted dashboard_url:", dashboardUrl);
+      addRequestLog(`Extracted task_id: ${taskId}`);
+      addRequestLog(`Extracted dashboard_url: ${dashboardUrl || 'none'}`);
+      
+      if (data && data.status === "completed") {
+        if (dashboardUrl) {
+          // If we have a dashboard URL, fetch directly from there
+          setDashboardUrl(dashboardUrl);
+          setTaskId(taskId);
+          loadDashboardFromUrl(dashboardUrl);
+        } else if (taskId) {
+          // Otherwise use task ID to fetch dashboard
+          setTaskId(taskId);
+          loadDashboardData(taskId);
+        } else {
+          setIsLoading(false);
+          setDashboardHtml("<div>No dashboard data available. Missing task ID and dashboard URL.</div>");
+          addRequestLog(`Missing task ID and dashboard URL in metadata`);
+          toast.error("Missing task ID and dashboard URL in metadata");
+        }
       } else {
         setIsLoading(false);
         setDashboardHtml("<div>No dashboard data available yet. Status: " + data.status + "</div>");
@@ -162,12 +179,76 @@ export function DashboardContent({ projectId, dataSourceId }: DashboardProps) {
     }
   };
 
+  // New function to load dashboard directly from URL
+  const loadDashboardFromUrl = async (url: string) => {
+    try {
+      addRequestLog(`Loading dashboard directly from URL: ${url}`);
+      
+      // Check if URL is absolute or relative
+      const dashboardEndpoint = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+      
+      addRequestLog(`Fetching dashboard HTML from: ${dashboardEndpoint}`);
+      
+      const response = await fetch(dashboardEndpoint);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        addRequestLog(`Error fetching dashboard HTML: ${errorText}`);
+        throw new Error(`Failed to fetch dashboard: ${response.statusText}`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('text/html')) {
+        const html = await response.text();
+        addRequestLog(`Received dashboard HTML content (${html.length} characters)`);
+        setDashboardHtml(html);
+      } else {
+        // Try to get JSON for KPIs
+        try {
+          const json = await response.json();
+          addRequestLog(`Received JSON response instead of HTML`);
+          
+          if (json.html) {
+            setDashboardHtml(json.html);
+          }
+          
+          if (json.kpis) {
+            setKpis(json.kpis);
+          }
+          
+          setDebugInfo(prev => ({ ...prev, dashboardData: json }));
+        } catch (e) {
+          addRequestLog(`Response is not HTML or valid JSON`);
+          const text = await response.text();
+          setDashboardHtml(`<div>${text}</div>`);
+        }
+      }
+      
+      setIsLoading(false);
+    } catch (error: any) {
+      console.error("Error loading dashboard from URL:", error);
+      addRequestLog(`Error loading dashboard from URL: ${error.message}`);
+      setIsLoading(false);
+      setDashboardHtml("<div>Error loading dashboard from URL. Please check console for details.</div>");
+      toast.error("Failed to load dashboard from URL");
+    }
+  };
+
   const loadDashboardData = async (tid: string) => {
     try {
       console.log("Loading dashboard data for task:", tid);
       addRequestLog(`Loading dashboard data for task: ${tid}`);
       
-      // Fetch dashboard HTML content
+      // Check if task has dashboard URL
+      const { data: statusData } = await checkTaskStatus(tid);
+      if (statusData?.dashboard_url) {
+        addRequestLog(`Found dashboard URL in task status: ${statusData.dashboard_url}`);
+        setDashboardUrl(statusData.dashboard_url);
+        return loadDashboardFromUrl(statusData.dashboard_url);
+      }
+      
+      // If no dashboard URL, fall back to fetching dashboard HTML content
       addRequestLog(`Fetching dashboard HTML content from /api/v1/dashboard/${tid}/html`);
       const { data: dashboardData, error: dashboardError } = await fetchDashboardData(tid);
       
@@ -218,7 +299,10 @@ export function DashboardContent({ projectId, dataSourceId }: DashboardProps) {
 
   const refreshDashboard = () => {
     addRequestLog("Manually refreshing dashboard data");
-    if (taskId) {
+    if (dashboardUrl) {
+      setIsLoading(true);
+      loadDashboardFromUrl(dashboardUrl);
+    } else if (taskId) {
       setIsLoading(true);
       loadDashboardData(taskId);
     } else if (dataSourceId) {
@@ -361,6 +445,13 @@ export function DashboardContent({ projectId, dataSourceId }: DashboardProps) {
             
             <p className="font-semibold mt-4 mb-2">Task ID:</p>
             <pre className="bg-muted p-2 rounded">{taskId || "None"}</pre>
+            
+            {dashboardUrl && (
+              <>
+                <p className="font-semibold mt-4 mb-2">Dashboard URL:</p>
+                <pre className="bg-muted p-2 rounded">{dashboardUrl}</pre>
+              </>
+            )}
             
             <p className="font-semibold mt-4 mb-2">Request Log:</p>
             <div className="max-h-48 overflow-y-auto bg-muted rounded p-2 mt-1">

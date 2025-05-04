@@ -22,5 +22,6 @@ export interface TaskStatusResponse {
   processing_task_id?: string;
   analysis_task_id?: string;
   dashboard_task_id?: string;
+  dashboard_url?: string;
   [key: string]: any;
 }

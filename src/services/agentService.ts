@@ -259,10 +259,7 @@ export const getProjectById = async (projectId: string) => {
   }
 };
 
-// This calls your FastAPI backend for data collection
-// This is an updated version of the triggerCollectionApi function
-// to use the pipeline API instead of the collector API
-
+// This calls your FastAPI backend for data collection using the pipeline API
 const triggerCollectionApi = async (dataSource: any) => {
   try {
     console.log("Triggering pipeline API for data source:", dataSource);
@@ -271,14 +268,55 @@ const triggerCollectionApi = async (dataSource: any) => {
     await updateDataSourceStatus(dataSource.id, "collecting");
     
     // Create the request payload based on data source type
+    const sourceType = dataSource.type;
+    
+    // Build the config object with the correct structure
+    const config = {};
+    
+    // Set up the source-specific config
+    switch (sourceType) {
+      case "social":
+        config[sourceType] = {
+          url: dataSource.url,
+          platform: "Twitter", // Default platform
+          date_range: "last_30_days", // Default date range
+          hashtags: ["#feedback"], // Default hashtag
+          ...(dataSource.metadata && typeof dataSource.metadata === 'object' 
+              ? dataSource.metadata.social || {} : {})
+        };
+        break;
+      case "reviews":
+        config[sourceType] = {
+          url: dataSource.url,
+          websites: ["Google", "Yelp"], // Default review sites
+          date_range: "last_30_days", // Default date range
+          ...(dataSource.metadata && typeof dataSource.metadata === 'object' 
+              ? dataSource.metadata.review || {} : {})
+        };
+        break;
+      case "survey":
+        config[sourceType] = {
+          url: dataSource.url,
+          form_id: "default_form", // Default form ID
+          api_endpoints: [], // Default empty API endpoints
+          ...(dataSource.metadata && typeof dataSource.metadata === 'object' 
+              ? dataSource.metadata.survey || {} : {})
+        };
+        break;
+      case "forum":
+      case "website":
+      default:
+        config[sourceType] = {
+          url: dataSource.url,
+          ...(dataSource.metadata && typeof dataSource.metadata === 'object' 
+              ? dataSource.metadata[sourceType] || {} : {})
+        };
+        break;
+    }
+    
     const payload = {
       source_id: dataSource.id,
-      config: {
-        [dataSource.type]: {
-          url: dataSource.url,
-          ...(dataSource.metadata && typeof dataSource.metadata === 'object' ? dataSource.metadata : {})
-        }
-      }
+      config: config
     };
 
     console.log("Sending payload to pipeline API:", payload);
@@ -294,22 +332,39 @@ const triggerCollectionApi = async (dataSource: any) => {
     console.log("Pipeline service response:", data);
     
     // If pipeline was successful, store task ID in metadata
-    if (data?.task_id) {
-      // Store task ID in metadata
+    if (data) {
+      // Store task ID and dashboard URL (if available) in metadata
       let updatedMetadata = {};
       
       // Only spread if dataSource.metadata is an object
       if (dataSource.metadata && typeof dataSource.metadata === 'object') {
         updatedMetadata = { 
           ...dataSource.metadata, 
+          task_id: data.task_id,
           pipeline_task_id: data.task_id,
           pipeline_started: new Date().toISOString()
         };
+        
+        // Store dashboard URL if available
+        if (data.dashboard_url) {
+          updatedMetadata = {
+            ...updatedMetadata,
+            dashboard_url: data.dashboard_url
+          };
+        }
       } else {
         updatedMetadata = { 
+          task_id: data.task_id,
           pipeline_task_id: data.task_id,
           pipeline_started: new Date().toISOString()
         };
+        
+        if (data.dashboard_url) {
+          updatedMetadata = {
+            ...updatedMetadata,
+            dashboard_url: data.dashboard_url
+          };
+        }
       }
       
       await supabase
@@ -429,6 +484,14 @@ const pollPipelineStatus = async (dataSourceId: string, taskId: string) => {
             updatedMetadata = { 
               ...updatedMetadata, 
               dashboard_task_id: taskStatus.dashboard_task_id 
+            };
+          }
+          
+          // Store dashboard URL if available
+          if (taskStatus.dashboard_url) {
+            updatedMetadata = {
+              ...updatedMetadata,
+              dashboard_url: taskStatus.dashboard_url
             };
           }
           
