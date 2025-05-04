@@ -293,7 +293,7 @@ const triggerCollectionApi = async (dataSource: any) => {
     // If task ID is returned, start polling for status
     if (data?.task_id) {
       // Store task ID in metadata
-      // Create a proper object for updatedMetadata
+      // Fix for spread error: Create a proper object for updatedMetadata
       const updatedMetadata = dataSource.metadata ? 
         { ...Object.assign({}, dataSource.metadata), task_id: data.task_id } :
         { task_id: data.task_id };
@@ -322,7 +322,7 @@ const triggerCollectionApi = async (dataSource: any) => {
           const response = statusData as TaskStatusResponse;
           const status = response.status;
           
-          // Update metadata with latest task status
+          // Fix for spread error: Create proper object for updatedTaskMetadata
           const updatedTaskMetadata = updatedMetadata ? 
             { ...Object.assign({}, updatedMetadata), task_status: status, task_updated: new Date().toISOString() } : 
             { task_status: status, task_updated: new Date().toISOString() };

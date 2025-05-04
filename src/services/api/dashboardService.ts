@@ -9,9 +9,11 @@ export const generateDashboard = async (
   includeReport: boolean = true
 ) => {
   try {
-    const url = new URL(`/dashboard/${analysisTaskId}`, apiRequest.toString());
+    const url = new URL(`/api/v1/dashboard/${analysisTaskId}`, apiRequest.toString());
     url.searchParams.append("include_alerts", includeAlerts.toString());
     url.searchParams.append("include_report", includeReport.toString());
+    
+    console.log("Generating dashboard with URL:", url.toString());
     
     return await apiRequest(url.pathname + url.search, {
       method: "POST"
@@ -27,7 +29,7 @@ export const generateDashboard = async (
 export const fetchDashboardHtml = async (taskId: string) => {
   try {
     console.log("Fetching dashboard HTML for task:", taskId);
-    return await apiRequest(`/dashboard/${taskId}/html`);
+    return await apiRequest(`/api/v1/dashboard/${taskId}/html`);
   } catch (error: any) {
     console.error("Error fetching dashboard HTML:", error);
     toast.error("Failed to fetch dashboard");
@@ -40,7 +42,7 @@ export const fetchDashboardData = async (taskId: string) => {
   try {
     console.log("Fetching dashboard data for task:", taskId);
     // First get the HTML content
-    const { data: html, error } = await apiRequest<string>(`/dashboard/${taskId}/html`);
+    const { data: html, error } = await apiRequest<string>(`/api/v1/dashboard/${taskId}/html`);
     
     if (error) throw error;
     
@@ -59,7 +61,7 @@ export const fetchDashboardData = async (taskId: string) => {
 export const fetchReportData = async (dashboardTaskId: string) => {
   try {
     console.log("Fetching report data for task:", dashboardTaskId);
-    return await apiRequest(`/report/${dashboardTaskId}`);
+    return await apiRequest(`/api/v1/report/${dashboardTaskId}`);
   } catch (error: any) {
     console.error("Error fetching report data:", error);
     toast.error("Failed to fetch report data");
