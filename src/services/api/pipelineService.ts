@@ -1,6 +1,15 @@
+
 import { apiRequest } from "./baseApiService";
 import { toast } from "sonner";
 import { checkTaskStatus, TaskStatusResponse } from "./taskService";
+
+// Define interface for pipeline response
+interface PipelineResponse {
+  task_id: string;
+  status: string;
+  message?: string;
+  [key: string]: any;
+}
 
 // Function to run the entire pipeline from collection to dashboard via a single API endpoint
 export const runFullAnalysisPipeline = async (sourceData: {
@@ -10,7 +19,7 @@ export const runFullAnalysisPipeline = async (sourceData: {
   try {
     // Call the unified pipeline endpoint
     toast.info("Starting analysis pipeline...");
-    const { data: pipelineData, error: pipelineError } = await apiRequest('/api/v1/pipeline', {
+    const { data: pipelineData, error: pipelineError } = await apiRequest<PipelineResponse>('/api/v1/pipeline', {
       method: "POST",
       body: JSON.stringify(sourceData)
     });
@@ -18,7 +27,7 @@ export const runFullAnalysisPipeline = async (sourceData: {
     if (pipelineError) throw pipelineError;
     
     // Get the main pipeline task ID
-    const pipelineTaskId = pipelineData.task_id;
+    const pipelineTaskId = pipelineData?.task_id;
     if (!pipelineTaskId) throw new Error("No task ID returned from pipeline");
     
     // Poll for pipeline status

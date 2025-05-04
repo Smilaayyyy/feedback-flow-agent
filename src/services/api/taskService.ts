@@ -17,5 +17,10 @@ export interface TaskStatusResponse {
   message?: string;
   sources?: any[];
   timestamp: string;
+  current_stage?: string;
+  collection_task_id?: string;
+  processing_task_id?: string;
+  analysis_task_id?: string;
+  dashboard_task_id?: string;
   [key: string]: any;
 }
