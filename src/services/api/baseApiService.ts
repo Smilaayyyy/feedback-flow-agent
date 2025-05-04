@@ -1,7 +1,7 @@
 
 // Common API configuration and utility functions
 
-// API endpoint configuration
+// API endpoint configuration 
 export const API_BASE_URL = "https://ai-feedback-agrregator.onrender.com/api/v1";
 
 // Base fetch function with error handling
@@ -10,7 +10,12 @@ export async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<{ data: T | null; error: Error | null }> {
   try {
-    const url = `${API_BASE_URL}${endpoint}`;
+    // Make sure endpoint starts with / for consistency
+    const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    
+    // Add API_BASE_URL to the endpoint
+    const url = `${API_BASE_URL}${normalizedEndpoint}`;
+    
     console.log(`Making API request to: ${url}`);
     
     const response = await fetch(url, {

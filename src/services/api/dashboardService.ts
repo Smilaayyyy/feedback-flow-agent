@@ -9,13 +9,11 @@ export const generateDashboard = async (
   includeReport: boolean = true
 ) => {
   try {
-    const url = new URL(`/api/v1/dashboard/${analysisTaskId}`, apiRequest.toString());
-    url.searchParams.append("include_alerts", includeAlerts.toString());
-    url.searchParams.append("include_report", includeReport.toString());
+    const url = `/api/v1/dashboard/${analysisTaskId}?include_alerts=${includeAlerts.toString()}&include_report=${includeReport.toString()}`;
     
-    console.log("Generating dashboard with URL:", url.toString());
+    console.log("Generating dashboard with URL:", url);
     
-    return await apiRequest(url.pathname + url.search, {
+    return await apiRequest(url, {
       method: "POST"
     });
   } catch (error: any) {
@@ -41,7 +39,7 @@ export const fetchDashboardHtml = async (taskId: string) => {
 export const fetchDashboardData = async (taskId: string) => {
   try {
     console.log("Fetching dashboard data for task:", taskId);
-    // First get the HTML content
+    // Get the HTML content
     const { data: html, error } = await apiRequest<string>(`/api/v1/dashboard/${taskId}/html`);
     
     if (error) throw error;

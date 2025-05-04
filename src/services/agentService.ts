@@ -1,4 +1,3 @@
-
 // src/services/agentService.ts
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -293,7 +292,6 @@ const triggerCollectionApi = async (dataSource: any) => {
     // If task ID is returned, start polling for status
     if (data?.task_id) {
       // Store task ID in metadata
-      // Fix for spread error: Create a proper object for updatedMetadata
       const updatedMetadata = typeof dataSource.metadata === 'object' && dataSource.metadata !== null ? 
         { ...dataSource.metadata, task_id: data.task_id } :
         { task_id: data.task_id };
@@ -322,7 +320,6 @@ const triggerCollectionApi = async (dataSource: any) => {
           const response = statusData as TaskStatusResponse;
           const status = response.status;
           
-          // Fix for spread error: Create proper object for updatedTaskMetadata
           const updatedTaskMetadata = typeof updatedMetadata === 'object' && updatedMetadata !== null ?
             { ...updatedMetadata, task_status: status, task_updated: new Date().toISOString() } : 
             { task_status: status, task_updated: new Date().toISOString() };
@@ -343,9 +340,21 @@ const triggerCollectionApi = async (dataSource: any) => {
               await updateDataSourceStatus(dataSource.id, "completed");
               
               // Store final results in metadata
-              const finalMetadata = typeof updatedTaskMetadata === 'object' && updatedTaskMetadata !== null ? 
-                { ...updatedTaskMetadata, sources: response.sources, completion_time: new Date().toISOString() } : 
-                { sources: response.sources, completion_time: new Date().toISOString() };
+              let finalMetadata = {};
+              
+              // Only spread if updatedTaskMetadata is an object
+              if (typeof updatedTaskMetadata === 'object' && updatedTaskMetadata !== null) {
+                finalMetadata = {
+                  ...updatedTaskMetadata,
+                  sources: response.sources, 
+                  completion_time: new Date().toISOString()
+                }; 
+              } else {
+                finalMetadata = { 
+                  sources: response.sources, 
+                  completion_time: new Date().toISOString() 
+                };
+              }
               
               await supabase
                 .from("data_sources")
@@ -359,9 +368,21 @@ const triggerCollectionApi = async (dataSource: any) => {
               await updateDataSourceStatus(dataSource.id, "error");
               
               // Store error information
-              const errorMetadata = typeof updatedTaskMetadata === 'object' && updatedTaskMetadata !== null ? 
-                { ...updatedTaskMetadata, error_message: response.message, error_time: new Date().toISOString() } : 
-                { error_message: response.message, error_time: new Date().toISOString() };
+              let errorMetadata = {};
+              
+              // Only spread if updatedTaskMetadata is an object
+              if (typeof updatedTaskMetadata === 'object' && updatedTaskMetadata !== null) {
+                errorMetadata = {
+                  ...updatedTaskMetadata,
+                  error_message: response.message,
+                  error_time: new Date().toISOString()
+                };
+              } else {
+                errorMetadata = {
+                  error_message: response.message,
+                  error_time: new Date().toISOString()
+                };
+              }
               
               await supabase
                 .from("data_sources")
@@ -391,9 +412,20 @@ const triggerCollectionApi = async (dataSource: any) => {
             // If still not completed after timeout, mark as error
             await updateDataSourceStatus(dataSource.id, "error");
             
-            const timeoutMetadata = updatedMetadata ? 
-              { ...Object.assign({}, updatedMetadata), error_message: "Collection timed out after 10 minutes", error_time: new Date().toISOString() } : 
-              { error_message: "Collection timed out after 10 minutes", error_time: new Date().toISOString() };
+            let timeoutMetadata = {};
+            
+            if (typeof updatedMetadata === 'object' && updatedMetadata !== null) {
+              timeoutMetadata = { 
+                ...updatedMetadata, 
+                error_message: "Collection timed out after 10 minutes", 
+                error_time: new Date().toISOString() 
+              };
+            } else {
+              timeoutMetadata = { 
+                error_message: "Collection timed out after 10 minutes", 
+                error_time: new Date().toISOString() 
+              };
+            }
             
             await supabase
               .from("data_sources")
@@ -415,9 +447,20 @@ const triggerCollectionApi = async (dataSource: any) => {
     // Update status and metadata with error information
     await updateDataSourceStatus(dataSource.id, "error");
     
-    const errorMetadata = typeof dataSource.metadata === 'object' && dataSource.metadata !== null ? 
-      { ...dataSource.metadata, error_message: error.message, error_time: new Date().toISOString() } : 
-      { error_message: error.message, error_time: new Date().toISOString() };
+    let errorMetadata = {};
+    
+    if (typeof dataSource.metadata === 'object' && dataSource.metadata !== null) {
+      errorMetadata = { 
+        ...dataSource.metadata, 
+        error_message: error.message, 
+        error_time: new Date().toISOString() 
+      };
+    } else {
+      errorMetadata = { 
+        error_message: error.message, 
+        error_time: new Date().toISOString() 
+      };
+    }
     
     await supabase
       .from("data_sources")
@@ -480,4 +523,3 @@ export const runAnalysisPipeline = async (dataSourceId: string) => {
     return { success: false, error };
   }
 };
-
